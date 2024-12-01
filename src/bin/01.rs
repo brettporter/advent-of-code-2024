@@ -34,7 +34,18 @@ fn parse_input(input: &str) -> IResult<&str, Vec<(i32, i32)>> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let (_, values) = parse_input(input).unwrap();
+
+    let mut total = 0;
+
+    let list1 = values.iter().map(|v| v.0).collect_vec();
+    let list2 = values.iter().map(|v| v.1).collect_vec();
+
+    for v in list1 {
+        total += list2.iter().filter(|&x| *x == v).count() as u32 * v as u32;
+    }
+
+    Some(total)
 }
 
 #[cfg(test)]
@@ -50,6 +61,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(31));
     }
 }
