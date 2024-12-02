@@ -12,11 +12,13 @@ advent_of_code::solution!(1);
 pub fn part_one(input: &str) -> Option<u32> {
     let (_, values) = parse_input(input).unwrap();
 
+    // Transpose rows into columns, and sort these lists independently of each other to pair up the smallest each time
     let (mut list1, mut list2): (Vec<u32>, Vec<u32>) = values.into_iter().unzip();
 
     list1.sort();
     list2.sort();
 
+    // Add the difference of each pair in the lists
     Some(
         list1
             .iter()
@@ -35,10 +37,13 @@ fn parse_input(input: &str) -> IResult<&str, Vec<(u32, u32)>> {
 pub fn part_two(input: &str) -> Option<u32> {
     let (_, values) = parse_input(input).unwrap();
 
+    // Transpose rows into columns
     let (list1, list2): (Vec<u32>, Vec<u32>) = values.into_iter().unzip();
 
+    // For each number in the first list, count the number in the second list then multiple by the original value
+    // Add these together to calculate the total
     Some(list1.iter().fold(0, |acc, &e| {
-        acc + list2.iter().filter(|&&x| x == e).count() as u32 * e
+        acc + (list2.iter().filter(|&&x| x == e).count() as u32) * e
     }))
 }
 

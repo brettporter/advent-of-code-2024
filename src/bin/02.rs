@@ -14,8 +14,11 @@ fn parse_input(input: &str) -> IResult<&str, Vec<Vec<i32>>> {
 }
 
 fn is_safe(report: &[i32]) -> bool {
+    // Check the sign of the first two numbers, to ensure it is consistent throughout
     let sign = (report[1] - report[0]).signum();
 
+    // For each number, check the sign is the same (consistently increasing or decreasing)
+    // and check the difference is between 1 and 3 inclusive (regardless of sign)
     for i in 1..report.len() {
         if (report[i] - report[i - 1]).signum() != sign {
             return false;
@@ -27,6 +30,9 @@ fn is_safe(report: &[i32]) -> bool {
 }
 
 fn is_safe_with_dampener(report: &Vec<i32>) -> bool {
+    // Check if either the original array is safe, or if removing a single element makes it safe
+    // by iterating through all index numbers and testing for a slice that removes that index
+    // returning the first time it encounters a safe report
     is_safe(report)
         || (0..report.len()).any(|i| is_safe(&[&report[0..i], &report[i + 1..]].concat()))
 }
@@ -34,12 +40,14 @@ fn is_safe_with_dampener(report: &Vec<i32>) -> bool {
 pub fn part_one(input: &str) -> Option<u32> {
     let (_, reports) = parse_input(input).unwrap();
 
+    // Count the number of safe reports in the input
     Some(reports.iter().filter(|v| is_safe(v)).count() as u32)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
     let (_, reports) = parse_input(input).unwrap();
 
+    // Count the number of safe reports in the input, when calculated using a dampener for excluding any one element
     Some(reports.iter().filter(|v| is_safe_with_dampener(v)).count() as u32)
 }
 
