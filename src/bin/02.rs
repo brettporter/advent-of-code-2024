@@ -15,18 +15,13 @@ fn parse_input(input: &str) -> IResult<&str, Vec<Vec<i32>>> {
 
 fn is_safe(report: &[i32]) -> bool {
     // Check the sign of the first two numbers, to ensure it is consistent throughout
-    let sign = (report[1] - report[0]).signum();
+    let expected_signum = (report[0] - report[1]).signum();
 
     // For each number, check the sign is the same (consistently increasing or decreasing)
     // and check the difference is between 1 and 3 inclusive (regardless of sign)
-    for i in 1..report.len() {
-        if (report[i] - report[i - 1]).signum() != sign {
-            return false;
-        } else if !(1..=3).contains(&report[i].abs_diff(report[i - 1])) {
-            return false;
-        }
-    }
-    true
+    report.windows(2).all(|v| {
+        (v[0] - v[1]).signum() == expected_signum && (1..=3).contains(&v[0].abs_diff(v[1]))
+    })
 }
 
 fn is_safe_with_dampener(report: &Vec<i32>) -> bool {
