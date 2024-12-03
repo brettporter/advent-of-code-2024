@@ -8,82 +8,65 @@ use nom::{
 advent_of_code::solution!(3);
 
 #[derive(Debug)]
-enum Instruction {
-    DO,
-    DONT,
-    MUL,
+enum Command {
+    Do(),
+    Dont(),
+    Mul(u32, u32),
 }
 
-#[derive(Debug)]
-struct Command {
-    instruction: Instruction,
-    arguments: (u32, u32),
+impl Command {
+    fn parse(input: &str) -> Option<(&str, Self)> {
+        fn parse_no_args<'a>(name: &'a str, cmd: &'a str) -> IResult<&'a str, &'a str> {
+            preceded(tag(name), delimited(tag("("), tag(""), tag(")")))(cmd)
+        }
+        fn parse_mul(cmd: &str) -> IResult<&str, (u32, u32)> {
+            preceded(
+                tag("mul"),
+                delimited(tag("("), separated_pair(u32, tag(","), u32), tag(")")),
+            )(cmd)
+        }
+        if let Ok((rest, _)) = parse_no_args("do", input) {
+            Some((rest, Command::Do()))
+        } else if let Ok((rest, _)) = parse_no_args("don't", input) {
+            Some((rest, Command::Dont()))
+        } else if let Ok((rest, args)) = parse_mul(input) {
+            Some((rest, Command::Mul(args.0, args.1)))
+        } else {
+            None
+        }
+    }
 }
 
 fn parse_input(input: &str) -> Vec<Command> {
-    fn parse_mul_command(cmd: &str) -> IResult<&str, (u32, u32)> {
-        preceded(
-            tag("mul"),
-            delimited(tag("("), separated_pair(u32, tag(","), u32), tag(")")),
-        )(cmd)
-    }
-
     let mut commands = vec![];
 
     let mut remaining = input;
     while !remaining.is_empty() {
-        if remaining.starts_with("do()") {
-            remaining = &remaining[4..];
-            commands.push(Command {
-                instruction: Instruction::DO,
-                arguments: (0, 0),
-            });
-        } else if remaining.starts_with("don't()") {
-            remaining = &remaining[6..];
-            commands.push(Command {
-                instruction: Instruction::DONT,
-                arguments: (0, 0),
-            });
-        } else if let Ok((rest, arguments)) = parse_mul_command(remaining) {
+        if let Some((rest, cmd)) = Command::parse(remaining) {
             remaining = rest;
-            commands.push(Command {
-                instruction: Instruction::MUL,
-                arguments,
-            });
+            commands.push(cmd);
         } else {
-            remaining = &remaining[1..]
+            remaining = &remaining[1..];
         }
     }
 
     commands
-
-    // many1(preceded(
-    //     opt(char),
-    //     alt((
-    //         pair(tag("do"), tag("()")),
-    //         pair(tag("don't"), tag("()")),
-    //         preceded(
-    //             tag("mul"),
-    //             delimited(tag("("), separated_pair(digit1, tag(","), digit1), tag(")")),
-    //         ),
-    //     )),
-    // ))(input)
 }
 
 fn run(commands: &Vec<Command>) -> u32 {
     let mut total = 0;
     let mut enabled = true;
     for cmd in commands {
-        match cmd.instruction {
-            Instruction::DO => {
+        match cmd {
+            Command::Do() => {
                 enabled = true;
             }
-            Instruction::DONT => {
+            Command::Dont() => {
                 enabled = false;
             }
-            Instruction::MUL => {
+            Command::Mul(v1, v2) => {
                 if enabled {
-                    total += cmd.arguments.0 * cmd.arguments.1;
+                    total += v1 * v2;
                 }
             }
         }
@@ -92,7 +75,13 @@ fn run(commands: &Vec<Command>) -> u32 {
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    Some(run(&parse_input(input)))
+    let mut commands = parse_input(input);
+    commands.retain(|c| match c {
+        Command::Mul(_, _) => true,
+        _ => false,
+    });
+
+    Some(run(&commands))
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
