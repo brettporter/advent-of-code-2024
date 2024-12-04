@@ -61,7 +61,46 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let (_, grid) = parse_input(input).unwrap();
+
+    let grid = grid
+        .iter()
+        .map(|row| row.chars().collect_vec())
+        .collect_vec();
+
+    let size = grid.len() as i32;
+
+    const DIRECTIONS: [(i32, i32); 4] = [(-1, -1), (1, -1), (-1, 1), (1, 1)];
+    let mut count = 0;
+    for row in 0..size {
+        assert_eq!(size as usize, grid[row as usize].len());
+        for col in 0..size {
+            if grid[row as usize][col as usize] == 'A' {
+                if DIRECTIONS.iter().all(|(c, r)| {
+                    let x = col + c;
+                    let y = row + r;
+                    let opp_x = col - c;
+                    let opp_y = row - r;
+
+                    x >= 0
+                        && x < size
+                        && y >= 0
+                        && y < size
+                        && opp_x >= 0
+                        && opp_x < size
+                        && opp_y >= 0
+                        && opp_y < size
+                        && (grid[y as usize][x as usize] == 'M'
+                            || grid[y as usize][x as usize] == 'S')
+                        && (grid[opp_y as usize][opp_x as usize] != grid[y as usize][x as usize])
+                }) {
+                    count += 1;
+                }
+            }
+        }
+    }
+
+    Some(count)
 }
 
 #[cfg(test)]
@@ -77,6 +116,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(9));
     }
 }
