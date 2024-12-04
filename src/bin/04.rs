@@ -35,10 +35,10 @@ pub fn part_one(input: &str) -> Option<u32> {
             if grid[row as usize][col as usize] == 'X' {
                 for direction in DIRECTIONS {
                     if (1..=3).all(|idx| {
-                        let x = col + direction.0 * idx;
-                        let y = row + direction.1 * idx;
+                        let x = (col + direction.0 * idx) as usize;
+                        let y = (row + direction.1 * idx) as usize;
 
-                        grid[y as usize][x as usize] == WORD[idx as usize]
+                        grid[y][x] == WORD[idx as usize]
                     }) {
                         count += 1;
                     }
@@ -78,13 +78,13 @@ pub fn part_two(input: &str) -> Option<u32> {
         for col in 0..size {
             if grid[row as usize][col as usize] == 'A' {
                 if DIRECTIONS.iter().all(|(c, r)| {
-                    let x = col + c;
-                    let y = row + r;
-                    let opp_x = col - c;
-                    let opp_y = row - r;
+                    let x = (col + c) as usize;
+                    let y = (row + r) as usize;
+                    let opp_x = (col - c) as usize;
+                    let opp_y = (row - r) as usize;
 
-                    (grid[y as usize][x as usize] == 'M' || grid[y as usize][x as usize] == 'S')
-                        && (grid[opp_y as usize][opp_x as usize] != grid[y as usize][x as usize])
+                    (grid[y as usize][x] == 'M' || grid[y][x] == 'S')
+                        && (grid[opp_y][opp_x] != grid[y][x])
                 }) {
                     count += 1;
                 }
