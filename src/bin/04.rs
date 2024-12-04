@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use nom::{
     character::complete::{alpha1, newline},
     combinator::opt,
@@ -14,12 +13,7 @@ fn parse_input(input: &str) -> IResult<&str, Vec<&str>> {
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    let (_, grid) = parse_input(input).unwrap();
-
-    let grid = grid
-        .iter()
-        .map(|row| row.chars().collect_vec())
-        .collect_vec();
+    let grid = read_padded_grid(input, 3);
 
     let size = grid.len() as i32;
 
@@ -44,11 +38,7 @@ pub fn part_one(input: &str) -> Option<u32> {
                         let x = col + direction.0 * idx;
                         let y = row + direction.1 * idx;
 
-                        x >= 0
-                            && x < size
-                            && y >= 0
-                            && y < size
-                            && grid[y as usize][x as usize] == WORD[idx as usize]
+                        grid[y as usize][x as usize] == WORD[idx as usize]
                     }) {
                         count += 1;
                     }
@@ -60,13 +50,24 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(count)
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+fn read_padded_grid(input: &str, padding: usize) -> Vec<Vec<char>> {
     let (_, grid) = parse_input(input).unwrap();
 
-    let grid = grid
-        .iter()
-        .map(|row| row.chars().collect_vec())
-        .collect_vec();
+    let pad_rows = vec![vec![' '; grid[0].len() + padding * 2]; padding];
+
+    let mut result = pad_rows.clone();
+    result.extend(grid.iter().map(|row| {
+        let mut padded_row = vec![' '; padding];
+        padded_row.extend(row.chars());
+        padded_row.extend(vec![' '; padding]);
+        padded_row
+    }));
+    result.extend(pad_rows);
+    result
+}
+
+pub fn part_two(input: &str) -> Option<u32> {
+    let grid = read_padded_grid(input, 1);
 
     let size = grid.len() as i32;
 
@@ -82,16 +83,7 @@ pub fn part_two(input: &str) -> Option<u32> {
                     let opp_x = col - c;
                     let opp_y = row - r;
 
-                    x >= 0
-                        && x < size
-                        && y >= 0
-                        && y < size
-                        && opp_x >= 0
-                        && opp_x < size
-                        && opp_y >= 0
-                        && opp_y < size
-                        && (grid[y as usize][x as usize] == 'M'
-                            || grid[y as usize][x as usize] == 'S')
+                    (grid[y as usize][x as usize] == 'M' || grid[y as usize][x as usize] == 'S')
                         && (grid[opp_y as usize][opp_x as usize] != grid[y as usize][x as usize])
                 }) {
                     count += 1;
