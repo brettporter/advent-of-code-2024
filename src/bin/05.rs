@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use nom::{
     bytes::complete::tag,
     character::complete::{i32, newline},
@@ -43,7 +45,42 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let (_, (rules, reprints)) = parse_input(input).unwrap();
+
+    let mut total = 0;
+    for mut reprint in reprints {
+        let mut failed = false;
+        for i in 0..reprint.len() {
+            let r = reprint[i];
+            for &(before, after) in &rules {
+                if before == r {
+                    if reprint[0..i].iter().any(|&v| v == after) {
+                        failed = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if failed {
+            // TODO: reorder
+            reprint.sort_by(|&a, &b| {
+                let mut result = Ordering::Equal;
+                for &(before, after) in &rules {
+                    if before == a && after == b {
+                        result = Ordering::Greater;
+                        break;
+                    } else if after == a && before == b {
+                        result = Ordering::Less;
+                        break;
+                    }
+                }
+                result
+            });
+            total += reprint[reprint.len() / 2];
+        }
+    }
+
+    Some(total as u32)
 }
 
 #[cfg(test)]
@@ -59,6 +96,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(123));
     }
 }
