@@ -19,40 +19,18 @@ fn parse_input(input: &str) -> IResult<&str, (Vec<(i32, i32)>, Vec<Vec<i32>>)> {
     )(input)
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
-    let (_, (rules, reprints)) = parse_input(input).unwrap();
+fn check_reprints(
+    rules: &Vec<(i32, i32)>,
+    reprints: &Vec<Vec<i32>>,
+) -> (Vec<Vec<i32>>, Vec<Vec<i32>>) {
+    let mut success = vec![];
+    let mut fail = vec![];
 
-    let mut total = 0;
     for reprint in reprints {
         let mut failed = false;
         for i in 0..reprint.len() {
             let r = reprint[i];
-            for &(before, after) in &rules {
-                if before == r {
-                    if reprint[0..i].iter().any(|&v| v == after) {
-                        failed = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if !failed {
-            total += reprint[reprint.len() / 2];
-        }
-    }
-
-    Some(total as u32)
-}
-
-pub fn part_two(input: &str) -> Option<u32> {
-    let (_, (rules, reprints)) = parse_input(input).unwrap();
-
-    let mut total = 0;
-    for mut reprint in reprints {
-        let mut failed = false;
-        for i in 0..reprint.len() {
-            let r = reprint[i];
-            for &(before, after) in &rules {
+            for &(before, after) in rules {
                 if before == r {
                     if reprint[0..i].iter().any(|&v| v == after) {
                         failed = true;
@@ -62,25 +40,50 @@ pub fn part_two(input: &str) -> Option<u32> {
             }
         }
         if failed {
-            // TODO: reorder
-            reprint.sort_by(|&a, &b| {
-                let mut result = Ordering::Equal;
-                for &(before, after) in &rules {
-                    if before == a && after == b {
-                        result = Ordering::Greater;
-                        break;
-                    } else if after == a && before == b {
-                        result = Ordering::Less;
-                        break;
-                    }
-                }
-                result
-            });
-            total += reprint[reprint.len() / 2];
+            fail.push(reprint.clone());
+        } else {
+            success.push(reprint.clone());
         }
     }
+    (success, fail)
+}
 
-    Some(total as u32)
+pub fn part_one(input: &str) -> Option<u32> {
+    let (_, (rules, reprints)) = parse_input(input).unwrap();
+    let (success, _) = check_reprints(&rules, &reprints);
+
+    Some(
+        success
+            .iter()
+            .map(|reprint| reprint[reprint.len() / 2] as u32)
+            .sum(),
+    )
+}
+
+pub fn part_two(input: &str) -> Option<u32> {
+    let (_, (rules, reprints)) = parse_input(input).unwrap();
+    let (_, mut fail) = check_reprints(&rules, &reprints);
+
+    Some(
+        fail.iter_mut()
+            .map(|reprint| {
+                reprint.sort_by(|&a, &b| {
+                    let mut result = Ordering::Equal;
+                    for &(before, after) in &rules {
+                        if before == a && after == b {
+                            result = Ordering::Greater;
+                            break;
+                        } else if after == a && before == b {
+                            result = Ordering::Less;
+                            break;
+                        }
+                    }
+                    result
+                });
+                reprint[reprint.len() / 2] as u32
+            })
+            .sum(),
+    )
 }
 
 #[cfg(test)]
