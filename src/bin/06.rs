@@ -73,6 +73,13 @@ pub fn part_one(input: &str) -> Option<u32> {
         }
     }
 
+    // for r in &grid {
+    //     for c in r {
+    //         print!("{c}");
+    //     }
+    //     println!();
+    // }
+
     Some(
         grid.iter()
             .map(|r| r.iter().filter(|&&c| c == 'X').count() as u32)
@@ -83,38 +90,35 @@ pub fn part_one(input: &str) -> Option<u32> {
 pub fn part_two(input: &str) -> Option<u32> {
     let (_, mut grid) = parse_input(input).unwrap();
 
-    let mut pos = None;
-    let mut obstruction_options = vec![];
-
-    for (row, r) in grid.iter().enumerate() {
-        for (col, c) in r.iter().enumerate() {
-            match c {
-                '.' => obstruction_options.push((col, row)),
-                '^' => pos = Some((col as i32, row as i32)),
-                _ => {}
+    let pos = grid
+        .iter()
+        .enumerate()
+        .find_map(|(row, r)| {
+            if let Some(col) = r.iter().position(|&c| c == '^') {
+                Some((col as i32, row as i32))
+            } else {
+                None
             }
-        }
-    }
-
-    let pos = pos.unwrap();
+        })
+        .unwrap();
 
     grid[pos.1 as usize][pos.0 as usize] = 'X';
-    Some(
-        obstruction_options
-            .iter()
-            .filter(|&&o| {
-                let mut new_grid = grid.clone();
-                new_grid[o.1][o.0] = '#';
-                traverse_path(&new_grid, pos)
-            })
-            .count() as u32,
-    )
+
+    let mut obstructions = vec![];
+    traverse_path(&grid, &Direction::UP, pos, &mut obstructions, true);
+    Some(obstructions.len() as u32)
 }
 
-fn traverse_path(grid: &Vec<Vec<char>>, pos: (i32, i32)) -> bool {
+fn traverse_path(
+    grid: &Vec<Vec<char>>,
+    direction: &Direction,
+    pos: (i32, i32),
+    obstructions: &mut Vec<(i32, i32)>,
+    place_more: bool,
+) -> bool {
     let size = grid.len() as i32;
     let mut grid = grid.clone();
-    let mut direction = Direction::UP;
+    let mut direction = *direction;
     let mut pos = pos;
 
     let mut encountered = vec![];
@@ -123,6 +127,16 @@ fn traverse_path(grid: &Vec<Vec<char>>, pos: (i32, i32)) -> bool {
         let new_pos = direction.move_pos(pos);
         if new_pos.0 < 0 || new_pos.0 >= size || new_pos.1 < 0 || new_pos.1 >= size {
             return false;
+        }
+
+        if place_more && grid[new_pos.1 as usize][new_pos.0 as usize] == '.' {
+            // Try alternative
+            let mut new_grid = grid.clone();
+            new_grid[new_pos.1 as usize][new_pos.0 as usize] = '#';
+
+            if traverse_path(&new_grid, &direction, pos, obstructions, false) {
+                obstructions.push(new_pos);
+            }
         }
 
         if grid[new_pos.1 as usize][new_pos.0 as usize] == '#' {
