@@ -88,7 +88,71 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let (_, mut grid) = parse_input(input).unwrap();
+
+    let size = grid.len() as i32;
+
+    let orig_pos = grid
+        .iter()
+        .enumerate()
+        .find_map(|(row, r)| {
+            if let Some(col) = r.iter().position(|&c| c == '^') {
+                Some((col as i32, row as i32))
+            } else {
+                None
+            }
+        })
+        .unwrap();
+
+    let mut pos = orig_pos;
+    let mut direction = Direction::UP;
+    let mut obstructions = vec![];
+    grid[pos.1 as usize][pos.0 as usize] = 'X';
+    let orig_grid = grid.clone();
+
+    loop {
+        let new_pos = direction.move_pos(pos);
+        if new_pos.0 < 0 || new_pos.0 >= size || new_pos.1 < 0 || new_pos.1 >= size {
+            break;
+        }
+
+        // TODO: X not sufficient as it might not be the right direction
+        // Example (5, 4 wrong)
+        // Example missing (7, 9), (1, 8), (3, 8)
+
+        if grid[new_pos.1 as usize][new_pos.0 as usize] == 'X' {
+            let next_direction = direction.turn_clockwise();
+            let next_pos = next_direction.move_pos(new_pos);
+            if next_pos.0 >= 0 && next_pos.0 < size && next_pos.1 >= 0 && next_pos.1 < size {
+                if grid[next_pos.1 as usize][next_pos.0 as usize] == 'X' {
+                    let obs_pos = direction.move_pos(new_pos);
+                    if obs_pos.0 >= 0 && obs_pos.0 < size && obs_pos.1 >= 0 && obs_pos.1 < size {
+                        if grid[obs_pos.1 as usize][obs_pos.0 as usize] != '#'
+                            && !obstructions.contains(&obs_pos)
+                        {
+                            println!("Placed obstruction {:?}", obs_pos);
+                            obstructions.push(obs_pos);
+
+                            // reset position to start
+                            pos = orig_pos;
+                            direction = Direction::UP;
+                            grid = orig_grid.clone();
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        if grid[new_pos.1 as usize][new_pos.0 as usize] == '#' {
+            direction = direction.turn_clockwise();
+        } else {
+            grid[new_pos.1 as usize][new_pos.0 as usize] = 'X';
+            pos = new_pos;
+        }
+    }
+
+    Some(obstructions.len() as u32)
 }
 
 #[cfg(test)]
@@ -104,6 +168,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(6));
     }
 }
