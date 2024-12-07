@@ -49,7 +49,7 @@ fn find_result(a: u64, op: Operator, remaining: &[u64], result: u64) -> bool {
     }
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<u64> {
     let (_, eqs) = parse_input(input).unwrap();
 
     let mut total = 0;
@@ -62,7 +62,7 @@ pub fn part_one(input: &str) -> Option<u32> {
         }
     }
 
-    Some(total as u32)
+    Some(total as u64)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
