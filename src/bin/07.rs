@@ -13,6 +13,7 @@ advent_of_code::solution!(7);
 enum Operator {
     Add,
     Mult,
+    Concat,
 }
 
 impl Operator {
@@ -20,6 +21,7 @@ impl Operator {
         match *self {
             Self::Add => v1 + v2,
             Self::Mult => v1 * v2,
+            Self::Concat => format!("{}{}", v1, v2).parse().unwrap(),
         }
     }
 }
@@ -31,42 +33,49 @@ fn parse_input(input: &str) -> IResult<&str, Vec<(u64, Vec<u64>)>> {
     ))(input)
 }
 
-fn find_result(a: u64, op: Operator, remaining: &[u64], result: u64) -> bool {
+fn find_result(v: u64, remaining: &[u64], operators: &[Operator], result: &u64) -> bool {
     if remaining.is_empty() {
-        a == result
+        v == *result
     } else {
-        find_result(
-            op.apply(a, remaining[0]),
-            Operator::Add,
-            &remaining[1..],
-            result,
-        ) || find_result(
-            op.apply(a, remaining[0]),
-            Operator::Mult,
-            &remaining[1..],
-            result,
-        )
+        operators.iter().any(|op| {
+            find_result(
+                op.apply(v, remaining[0]),
+                &remaining[1..],
+                operators,
+                result,
+            )
+        })
     }
+}
+
+fn count_equations(eqs: &Vec<(u64, Vec<u64>)>, operators: &[Operator]) -> u64 {
+    eqs.iter()
+        .filter_map(|(result, args)| {
+            if operators
+                .iter()
+                .any(|op| find_result(op.apply(args[0], args[1]), &args[2..], operators, result))
+            {
+                Some(result)
+            } else {
+                None
+            }
+        })
+        .sum()
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
     let (_, eqs) = parse_input(input).unwrap();
 
-    let mut total = 0;
-
-    for (result, args) in eqs {
-        if find_result(args[0], Operator::Add, &args[1..], result)
-            || find_result(args[0], Operator::Mult, &args[1..], result)
-        {
-            total += result;
-        }
-    }
-
-    Some(total as u64)
+    Some(count_equations(&eqs, &[Operator::Add, Operator::Mult]))
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let (_, eqs) = parse_input(input).unwrap();
+
+    Some(count_equations(
+        &eqs,
+        &[Operator::Add, Operator::Mult, Operator::Concat],
+    ))
 }
 
 #[cfg(test)]
@@ -82,6 +91,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(11387));
     }
 }
