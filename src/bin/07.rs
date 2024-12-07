@@ -37,6 +37,9 @@ fn find_result(v: u64, remaining: &[u64], operators: &[Operator], result: &u64) 
     if remaining.is_empty() {
         v == *result
     } else {
+        if v > *result {
+            return false;
+        }
         operators.iter().any(|op| {
             find_result(
                 op.apply(v, remaining[0]),
