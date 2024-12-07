@@ -39,6 +39,7 @@ impl Direction {
 fn parse_input(input: &str) -> IResult<&str, Vec<Vec<char>>> {
     many1(terminated(many1(one_of(".^#")), opt(newline)))(input)
 }
+
 pub fn part_one(input: &str) -> Option<u32> {
     let (_, mut grid) = parse_input(input).unwrap();
 
