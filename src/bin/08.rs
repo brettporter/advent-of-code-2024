@@ -1,3 +1,5 @@
+use std::ops::RangeBounds;
+
 use fxhash::{FxHashMap, FxHashSet};
 use itertools::Itertools;
 use nom::{
@@ -14,7 +16,10 @@ fn parse_input(input: &str) -> IResult<&str, Vec<Vec<char>>> {
     many1(terminated(many1(none_of("\n")), opt(newline)))(input)
 }
 
-fn calculate_antinodes(input: &str, repeat: bool) -> Option<u32> {
+fn calculate_antinodes<R: RangeBounds<i32> + IntoIterator<Item = i32> + Clone>(
+    input: &str,
+    range: R,
+) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
     let size = grid.len() as i32;
@@ -41,16 +46,10 @@ fn calculate_antinodes(input: &str, repeat: bool) -> Option<u32> {
 
             let (&a1, &a2) = (pair[0], pair[1]);
 
-            let (x_diff, y_diff) = if repeat {
-                // repetitively towards (and including) the other antenna
-                (a2.0 - a1.0, a2.1 - a1.1)
-            } else {
-                // one step away from the other antenna
-                (a1.0 - a2.0, a1.1 - a2.1)
-            };
+            // repetitively towards (and including if first step is 1) the other antenna
+            let (x_diff, y_diff) = (a2.0 - a1.0, a2.1 - a1.1);
 
-            let mut num = 1;
-            loop {
+            for num in range.clone() {
                 let mut valid = false;
                 for new_antinode in vec![
                     (a1.0 + x_diff * num, a1.1 + y_diff * num),
@@ -66,9 +65,7 @@ fn calculate_antinodes(input: &str, repeat: bool) -> Option<u32> {
                     }
                 }
 
-                if repeat && valid {
-                    num += 1;
-                } else {
+                if !valid {
                     break;
                 }
             }
@@ -79,11 +76,11 @@ fn calculate_antinodes(input: &str, repeat: bool) -> Option<u32> {
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    calculate_antinodes(input, false)
+    calculate_antinodes(input, 2..=2)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    calculate_antinodes(input, true)
+    calculate_antinodes(input, 1..)
 }
 
 #[cfg(test)]
