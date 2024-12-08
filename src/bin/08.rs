@@ -14,7 +14,26 @@ fn parse_input(input: &str) -> IResult<&str, Vec<Vec<char>>> {
     many1(terminated(many1(none_of("\n")), opt(newline)))(input)
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
+fn possible_antinodes(a1: (i32, i32), a2: (i32, i32), num: i32, repeat: bool) -> Vec<(i32, i32)> {
+    let x_diff = a1.0 - a2.0;
+    let y_diff = a1.1 - a2.1;
+
+    if repeat {
+        vec![
+            (a1.0 + x_diff * num, a1.1 + y_diff * num),
+            (a2.0 - x_diff * num, a2.1 - y_diff * num),
+            (a1.0 - x_diff * num, a1.1 - y_diff * num),
+            (a2.0 + x_diff * num, a2.1 + y_diff * num),
+        ]
+    } else {
+        vec![
+            (a1.0 + x_diff * num, a1.1 + y_diff * num),
+            (a2.0 - x_diff * num, a2.1 - y_diff * num),
+        ]
+    }
+}
+
+fn calculate_antinodes(input: &str, repeat: bool) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
     let size = grid.len() as i32;
@@ -41,19 +60,24 @@ pub fn part_one(input: &str) -> Option<u32> {
 
             let (&a1, &a2) = (pair[0], pair[1]);
 
-            let x_diff = a1.0 - a2.0;
-            let y_diff = a1.1 - a2.1;
+            let mut num = 1;
+            loop {
+                let mut valid = false;
+                for new_antinode in possible_antinodes(a1, a2, num, repeat) {
+                    if new_antinode.0 >= 0
+                        && new_antinode.0 < size
+                        && new_antinode.1 >= 0
+                        && new_antinode.1 < size
+                    {
+                        valid = true;
+                        antinodes.insert(new_antinode);
+                    }
+                }
 
-            for new_antinode in vec![
-                (a1.0 + x_diff, a1.1 + y_diff),
-                (a2.0 - x_diff, a2.1 - y_diff),
-            ] {
-                if new_antinode.0 >= 0
-                    && new_antinode.0 < size
-                    && new_antinode.1 >= 0
-                    && new_antinode.1 < size
-                {
-                    antinodes.insert(new_antinode);
+                if repeat && valid {
+                    num += 1;
+                } else {
+                    break;
                 }
             }
         }
@@ -62,8 +86,12 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(antinodes.len() as u32)
 }
 
+pub fn part_one(input: &str) -> Option<u32> {
+    calculate_antinodes(input, false)
+}
+
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    calculate_antinodes(input, true)
 }
 
 #[cfg(test)]
@@ -79,6 +107,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(34));
     }
 }
