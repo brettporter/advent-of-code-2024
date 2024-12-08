@@ -14,25 +14,6 @@ fn parse_input(input: &str) -> IResult<&str, Vec<Vec<char>>> {
     many1(terminated(many1(none_of("\n")), opt(newline)))(input)
 }
 
-fn possible_antinodes(a1: (i32, i32), a2: (i32, i32), num: i32, repeat: bool) -> Vec<(i32, i32)> {
-    let x_diff = a1.0 - a2.0;
-    let y_diff = a1.1 - a2.1;
-
-    if repeat {
-        vec![
-            (a1.0 + x_diff * num, a1.1 + y_diff * num),
-            (a2.0 - x_diff * num, a2.1 - y_diff * num),
-            (a1.0 - x_diff * num, a1.1 - y_diff * num),
-            (a2.0 + x_diff * num, a2.1 + y_diff * num),
-        ]
-    } else {
-        vec![
-            (a1.0 + x_diff * num, a1.1 + y_diff * num),
-            (a2.0 - x_diff * num, a2.1 - y_diff * num),
-        ]
-    }
-}
-
 fn calculate_antinodes(input: &str, repeat: bool) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
@@ -60,10 +41,21 @@ fn calculate_antinodes(input: &str, repeat: bool) -> Option<u32> {
 
             let (&a1, &a2) = (pair[0], pair[1]);
 
+            let (x_diff, y_diff) = if repeat {
+                // repetitively towards (and including) the other antenna
+                (a2.0 - a1.0, a2.1 - a1.1)
+            } else {
+                // one step away from the other antenna
+                (a1.0 - a2.0, a1.1 - a2.1)
+            };
+
             let mut num = 1;
             loop {
                 let mut valid = false;
-                for new_antinode in possible_antinodes(a1, a2, num, repeat) {
+                for new_antinode in vec![
+                    (a1.0 + x_diff * num, a1.1 + y_diff * num),
+                    (a2.0 - x_diff * num, a2.1 - y_diff * num),
+                ] {
                     if new_antinode.0 >= 0
                         && new_antinode.0 < size
                         && new_antinode.1 >= 0
