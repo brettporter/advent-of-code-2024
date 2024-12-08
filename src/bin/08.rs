@@ -1,7 +1,6 @@
 use std::ops::RangeBounds;
 
 use fxhash::{FxHashMap, FxHashSet};
-use itertools::Itertools;
 use nom::{
     character::complete::{newline, none_of},
     combinator::opt,
@@ -41,32 +40,24 @@ fn calculate_antinodes<R: RangeBounds<i32> + IntoIterator<Item = i32> + Clone>(
     let mut antinodes = FxHashSet::default();
 
     for (_, a) in antennas {
-        for pair in a.iter().combinations(2) {
-            assert_eq!(pair.len(), 2);
+        for a1 in &a {
+            for a2 in &a {
+                if a1 != a2 {
+                    // repetitively towards (and including if first step is 1) the other antenna
+                    let (x_diff, y_diff) = (a2.0 - a1.0, a2.1 - a1.1);
 
-            let (&a1, &a2) = (pair[0], pair[1]);
-
-            // repetitively towards (and including if first step is 1) the other antenna
-            let (x_diff, y_diff) = (a2.0 - a1.0, a2.1 - a1.1);
-
-            for num in range.clone() {
-                let mut valid = false;
-                for new_antinode in vec![
-                    (a1.0 + x_diff * num, a1.1 + y_diff * num),
-                    (a2.0 - x_diff * num, a2.1 - y_diff * num),
-                ] {
-                    if new_antinode.0 >= 0
-                        && new_antinode.0 < size
-                        && new_antinode.1 >= 0
-                        && new_antinode.1 < size
-                    {
-                        valid = true;
-                        antinodes.insert(new_antinode);
+                    for num in range.clone() {
+                        let new_antinode = (a1.0 + x_diff * num, a1.1 + y_diff * num);
+                        if new_antinode.0 >= 0
+                            && new_antinode.0 < size
+                            && new_antinode.1 >= 0
+                            && new_antinode.1 < size
+                        {
+                            antinodes.insert(new_antinode);
+                        } else {
+                            break;
+                        }
                     }
-                }
-
-                if !valid {
-                    break;
                 }
             }
         }
