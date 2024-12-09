@@ -1,126 +1,97 @@
-use fxhash::{FxHashMap, FxHashSet};
 use itertools::Itertools;
 use nom::{character::complete::digit1, IResult, InputIter};
 
 advent_of_code::solution!(9);
 
+struct FileRecord {
+    pos: usize,
+    size: usize,
+}
+
 fn parse_input(input: &str) -> IResult<&str, &str> {
     digit1(input)
 }
 
-pub fn part_one(input: &str) -> Option<u64> {
+fn create_disk_map(input: &str) -> Vec<usize> {
     let (_, disk_map) = parse_input(input).unwrap();
 
-    let disk_map = disk_map
+    disk_map
         .iter_elements()
-        .map(|c| c.to_digit(10).unwrap() as u64)
-        .collect_vec();
+        .map(|c| c.to_digit(10).unwrap() as usize)
+        .collect_vec()
+}
 
-    let blocks = disk_map
-        .iter()
+fn create_disk(disk_map: Vec<usize>) -> (Vec<i32>, Vec<FileRecord>) {
+    let disk_size: usize = disk_map.iter().sum();
+    let mut disk = Vec::with_capacity(disk_size);
+
+    let mut blocks = vec![];
+    for (i, &size) in disk_map.iter().enumerate() {
+        if i % 2 == 0 {
+            let id = i / 2;
+            let pos = disk.len();
+            blocks.push(FileRecord { pos, size });
+            for _ in 0..size {
+                disk.push(id as i32);
+            }
+        } else {
+            for _ in 0..size {
+                disk.push(-1);
+            }
+        }
+    }
+    assert_eq!(disk.len(), disk_size);
+
+    (disk, blocks)
+}
+
+fn checksum_disk(disk: Vec<i32>) -> u64 {
+    disk.iter()
         .enumerate()
-        .filter_map(|(i, &count)| if i % 2 == 0 { Some(count) } else { None })
-        .collect_vec();
+        .filter(|(_, &v)| v != -1)
+        .fold(0, |acc, (pos, &v)| acc + (pos as u64 * v as u64))
+}
 
-    let mut pull_from = blocks.len() - 1;
-    let mut pull_remaining = blocks[pull_from];
+pub fn part_one(input: &str) -> Option<u64> {
+    let disk_map = create_disk_map(input);
+    let (mut disk, _) = create_disk(disk_map);
 
-    let mut checksum = 0u64;
-    let mut pos = 0u64;
-
-    for (idx, &count) in blocks.iter().enumerate() {
-        if idx > pull_from {
+    let mut last_ptr = disk.len() - 1;
+    for i in 0..disk.len() {
+        if i >= last_ptr {
             break;
         }
-        if idx == pull_from {
-            for i in 0..pull_remaining {
-                checksum += (pos + i) * idx as u64;
-            }
-            break;
-        }
-
-        for i in 0..count {
-            checksum += (pos + i) * idx as u64;
-        }
-        pos += count;
-
-        // fill space
-        let mut space = disk_map[idx * 2 + 1];
-        while space > 0 {
-            let pull = space.min(pull_remaining);
-            for i in 0..pull {
-                checksum += (pos + i) * pull_from as u64;
-            }
-            pos += pull;
-            pull_remaining -= pull;
-            space -= pull;
-
-            if space > 0 {
-                pull_from -= 1;
-                pull_remaining = blocks[pull_from];
-                if idx == pull_from {
-                    break;
-                }
+        if disk[i] == -1 {
+            disk[i] = disk[last_ptr];
+            disk[last_ptr] = -1;
+            while disk[last_ptr] == -1 {
+                last_ptr -= 1;
             }
         }
     }
 
-    Some(checksum)
+    Some(checksum_disk(disk))
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    let (_, disk_map) = parse_input(input).unwrap();
+    let disk_map = create_disk_map(input);
+    let (mut disk, blocks) = create_disk(disk_map);
 
-    let mut disk_map = disk_map
-        .iter_elements()
-        .map(|c| c.to_digit(10).unwrap() as u64)
-        .collect_vec();
-
-    let blocks = disk_map
-        .iter()
-        .enumerate()
-        .filter_map(|(i, &count)| if i % 2 == 0 { Some(count) } else { None })
-        .collect_vec();
-
-    let mut spaces = FxHashMap::default();
-    for (idx, &count) in blocks.iter().enumerate().rev() {
-        for s in 0..idx {
-            if disk_map[s * 2 + 1] >= count {
-                disk_map[s * 2 + 1] -= count;
-                spaces
-                    .entry(s)
-                    .and_modify(|v: &mut Vec<(usize, u64)>| v.push((idx, count)))
-                    .or_insert(vec![(idx, count)]);
-                break;
+    for (id, rec) in blocks.iter().enumerate().rev() {
+        if let Some(dest) = disk.iter().enumerate().position(|(i, &v)| {
+            v == -1
+                && i < rec.pos
+                && i + rec.size <= disk.len()
+                && disk[i..i + rec.size].iter().all(|&v| v == -1)
+        }) {
+            for i in 0..rec.size {
+                disk[i + dest] = id as i32;
+                disk[i + rec.pos] = -1;
             }
         }
     }
 
-    let mut checksum = 0;
-    let mut pos = 0;
-    let mut counted = FxHashSet::default();
-    for (idx, &count) in blocks.iter().enumerate() {
-        if !counted.contains(&idx) {
-            for i in 0..count {
-                checksum += (pos + i) * idx as u64;
-            }
-        }
-        pos += count;
-        if let Some(s) = spaces.get(&idx) {
-            for &(id, c) in s {
-                for i in 0..c {
-                    checksum += (pos + i) * id as u64;
-                }
-                counted.insert(id);
-                pos += c;
-            }
-        }
-        if let Some(&remaining) = disk_map.get(idx * 2 + 1) {
-            pos += remaining;
-        }
-    }
-
-    Some(checksum)
+    Some(checksum_disk(disk))
 }
 
 #[cfg(test)]
