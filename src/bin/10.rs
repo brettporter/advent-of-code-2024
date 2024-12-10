@@ -1,6 +1,6 @@
 use std::fmt::Error;
 
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashSet;
 use itertools::Itertools;
 use nom::{
     character::complete::{digit1, newline},
@@ -36,44 +36,37 @@ fn calculate_trailheads(input: &str, method: Method) -> u32 {
     let size = trail_map.len();
     assert_eq!(trail_map[0].len(), size);
 
-    let mut trailheads = vec![];
-    let mut connections = FxHashMap::default();
-
-    for (row, r) in trail_map.iter().enumerate() {
-        for (col, &c) in r.iter().enumerate() {
-            let entry = connections.entry((col, row)).or_insert(vec![]);
-            if row > 0 && trail_map[row - 1][col] == c + 1 {
-                entry.push((col, row - 1));
-            }
-            if row < size - 1 && trail_map[row + 1][col] == c + 1 {
-                entry.push((col, row + 1));
-            }
-            if col > 0 && trail_map[row][col - 1] == c + 1 {
-                entry.push((col - 1, row));
-            }
-            if col < size - 1 && trail_map[row][col + 1] == c + 1 {
-                entry.push((col + 1, row));
-            }
-
-            if c == 0 {
-                trailheads.push((col, row));
-            }
-        }
-    }
+    let trailheads = trail_map.iter().enumerate().flat_map(|(row, r)| {
+        r.iter()
+            .enumerate()
+            .filter_map(move |(col, &c)| if c == 0 { Some((col, row)) } else { None })
+    });
 
     trailheads
-        .iter()
         .map(|trailhead| {
             let mut found = FxHashSet::default();
             let mut count = 0;
             let mut remaining = vec![trailhead];
             while !remaining.is_empty() {
                 let next = remaining.pop().unwrap();
-                if trail_map[next.1][next.0] == 9 {
+                let (col, row) = next;
+                let c = trail_map[row][col];
+                if c == 9 {
                     found.insert(next);
                     count += 1;
                 } else {
-                    remaining.extend(connections[next].iter());
+                    if row > 0 && trail_map[row - 1][col] == c + 1 {
+                        remaining.push((col, row - 1));
+                    }
+                    if row < size - 1 && trail_map[row + 1][col] == c + 1 {
+                        remaining.push((col, row + 1));
+                    }
+                    if col > 0 && trail_map[row][col - 1] == c + 1 {
+                        remaining.push((col - 1, row));
+                    }
+                    if col < size - 1 && trail_map[row][col + 1] == c + 1 {
+                        remaining.push((col + 1, row));
+                    }
                 }
             }
             match method {
