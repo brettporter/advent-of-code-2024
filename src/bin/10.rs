@@ -77,7 +77,54 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let (_, trail_map) = parse_input(input).unwrap();
+
+    let size = trail_map.len();
+    assert_eq!(trail_map[0].len(), size);
+
+    let mut trailheads = vec![];
+    let mut connections = FxHashMap::default();
+
+    for (row, r) in trail_map.iter().enumerate() {
+        for (col, &c) in r.iter().enumerate() {
+            let entry = connections.entry((col, row)).or_insert(vec![]);
+            if row > 0 && trail_map[row - 1][col] == c + 1 {
+                entry.push((col, row - 1));
+            }
+            if row < size - 1 && trail_map[row + 1][col] == c + 1 {
+                entry.push((col, row + 1));
+            }
+            if col > 0 && trail_map[row][col - 1] == c + 1 {
+                entry.push((col - 1, row));
+            }
+            if col < size - 1 && trail_map[row][col + 1] == c + 1 {
+                entry.push((col + 1, row));
+            }
+
+            if c == 0 {
+                trailheads.push((col, row));
+            }
+        }
+    }
+
+    Some(
+        trailheads
+            .iter()
+            .map(|trailhead| {
+                let mut count = 0;
+                let mut remaining = vec![trailhead];
+                while !remaining.is_empty() {
+                    let next = remaining.pop().unwrap();
+                    if trail_map[next.1][next.0] == 9 {
+                        count += 1;
+                    } else {
+                        remaining.extend(connections[next].iter());
+                    }
+                }
+                count
+            })
+            .sum(),
+    )
 }
 
 #[cfg(test)]
@@ -93,6 +140,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(81));
     }
 }
