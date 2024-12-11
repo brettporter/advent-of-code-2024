@@ -15,36 +15,43 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 fn count_all_stones(numbers: &[u64], it: i32) -> u64 {
-    let mut memo = FxHashMap::default();
-
-    numbers
-        .iter()
-        .map(|&n| count_stones(n, it, &mut memo))
-        .sum()
-}
-
-fn count_stones(n: u64, it: i32, memo: &mut FxHashMap<(u64, i32), u64>) -> u64 {
-    if it == 0 {
-        return 1;
+    let mut stones = FxHashMap::default();
+    for &n in numbers {
+        stones.insert(n, 1);
     }
 
-    if let Some(result) = memo.get(&(n, it)) {
-        return *result;
-    }
-
-    let result = if n == 0 {
-        count_stones(1, it - 1, memo)
-    } else {
-        let digits = n.ilog10() + 1;
-        if digits % 2 == 0 {
-            let p = 10u64.pow(digits / 2);
-            count_stones(n / p, it - 1, memo) + count_stones(n % p, it - 1, memo)
-        } else {
-            count_stones(n * 2024, it - 1, memo)
+    for _ in 0..it {
+        let mut new_stones = FxHashMap::default();
+        for (n, count) in stones {
+            if n == 0 {
+                new_stones
+                    .entry(1)
+                    .and_modify(|n| *n += count)
+                    .or_insert(count);
+            } else {
+                let digits = n.ilog10() + 1;
+                if digits % 2 == 0 {
+                    let p = 10u64.pow(digits / 2);
+                    new_stones
+                        .entry(n / p)
+                        .and_modify(|n| *n += count)
+                        .or_insert(count);
+                    new_stones
+                        .entry(n % p)
+                        .and_modify(|n| *n += count)
+                        .or_insert(count);
+                } else {
+                    new_stones
+                        .entry(n * 2024)
+                        .and_modify(|n| *n += count)
+                        .or_insert(count);
+                }
+            }
         }
-    };
-    memo.insert((n, it), result);
-    result
+        stones = new_stones;
+    }
+
+    stones.iter().map(|(_, v)| v).sum()
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
