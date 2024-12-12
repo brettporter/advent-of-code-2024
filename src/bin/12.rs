@@ -17,6 +17,7 @@ fn parse_input(input: &str) -> IResult<&str, Vec<Vec<char>>> {
 struct Region {
     area: u32,
     perimeter: u32,
+    sides: u32,
 }
 
 impl Region {
@@ -26,9 +27,13 @@ impl Region {
         row: usize,
         visited: &mut FxHashSet<(usize, usize)>,
     ) -> Self {
-        let (area, perimeter) = traverse(grid, col, row, visited);
+        let (area, perimeter, corners) = traverse(grid, col, row, visited);
 
-        Self { area, perimeter }
+        Self {
+            area,
+            perimeter,
+            sides: (corners - 2) * 2,
+        }
     }
 }
 
@@ -37,47 +42,72 @@ fn traverse(
     col: usize,
     row: usize,
     visited: &mut FxHashSet<(usize, usize)>,
-) -> (u32, u32) {
+) -> (u32, u32, u32) {
     if visited.contains(&(col, row)) {
-        return (0, 0);
+        return (0, 0, 0);
     }
     let size = grid.len();
     assert_eq!(size, grid[0].len());
 
     let mut area = 1;
     let mut perimeter = 0;
+    let mut corners = 0;
     let c = grid[row][col];
     visited.insert((col, row));
 
+    let (mut up_edge, mut down_edge, mut left_edge, mut right_edge) = (false, false, false, false);
+
     if row == 0 || grid[row - 1][col] != c {
         perimeter += 1;
+        up_edge = true;
     } else {
         let up = traverse(grid, col, row - 1, visited);
         area += up.0;
         perimeter += up.1;
+        corners += up.2;
     }
     if row == size - 1 || grid[row + 1][col] != c {
         perimeter += 1;
+        down_edge = true;
     } else {
         let down = traverse(grid, col, row + 1, visited);
         area += down.0;
         perimeter += down.1;
+        corners += down.2;
     }
     if col == 0 || grid[row][col - 1] != c {
         perimeter += 1;
+        left_edge = true;
     } else {
         let left = traverse(grid, col - 1, row, visited);
         area += left.0;
         perimeter += left.1;
+        corners += left.2;
     }
     if col == size - 1 || grid[row][col + 1] != c {
         perimeter += 1;
+        right_edge = true;
     } else {
         let right = traverse(grid, col + 1, row, visited);
         area += right.0;
         perimeter += right.1;
+        corners += right.2;
     }
-    (area, perimeter)
+
+    if left_edge && down_edge {
+        corners += 1;
+    }
+    if left_edge && up_edge {
+        corners += 1;
+    }
+    if right_edge && down_edge {
+        corners += 1;
+    }
+    if right_edge && up_edge {
+        corners += 1;
+    }
+
+    (area, perimeter, corners)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
@@ -88,7 +118,9 @@ pub fn part_one(input: &str) -> Option<u32> {
 
     for (row, r) in grid.clone().iter().enumerate() {
         for (col, _) in r.iter().enumerate() {
-            regions.push(Region::from(&grid, col, row, &mut visited));
+            if !visited.contains(&(col, row)) {
+                regions.push(Region::from(&grid, col, row, &mut visited));
+            }
         }
     }
 
@@ -96,7 +128,21 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let (_, grid) = parse_input(input).unwrap();
+
+    let mut regions = vec![];
+    let mut visited = FxHashSet::default();
+
+    for (row, r) in grid.clone().iter().enumerate() {
+        for (col, c) in r.iter().enumerate() {
+            if !visited.contains(&(col, row)) {
+                let region = Region::from(&grid, col, row, &mut visited);
+                regions.push(region);
+            }
+        }
+    }
+
+    Some(regions.iter().map(|v| v.sides * v.area).sum())
 }
 
 #[cfg(test)]
@@ -112,6 +158,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(1206));
     }
 }
