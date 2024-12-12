@@ -107,6 +107,11 @@ fn traverse(
         corners += 1;
     }
 
+    // TODO: instead of corners, let's try this:
+    //  * gather sides in arrays by vert (up, down) and horiz (left, right)
+    //  * sort the array for each vert coordinate and each horiz coordinate
+    //  * count all for perimeter
+    //  * collapse sequential items to count sides
     (area, perimeter, corners)
 }
 
@@ -159,5 +164,25 @@ mod tests {
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
         assert_eq!(result, Some(1206));
+
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 21,
+        ));
+        assert_eq!(result, Some(80));
+
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 22,
+        ));
+        assert_eq!(result, Some(436));
+
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 23,
+        ));
+        assert_eq!(result, Some(236));
+
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 24,
+        ));
+        assert_eq!(result, Some(368));
     }
 }
