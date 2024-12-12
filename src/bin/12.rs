@@ -1,4 +1,4 @@
-use fxhash::FxHashMap;
+use fxhash::FxHashSet;
 use nom::{
     character::complete::{newline, none_of},
     combinator::opt,
@@ -20,56 +20,79 @@ struct Region {
 }
 
 impl Region {
-    fn new(boundaries: u32) -> Self {
-        Self {
-            area: 1,
-            perimeter: boundaries,
-        }
-    }
+    fn from(
+        grid: &Vec<Vec<char>>,
+        col: usize,
+        row: usize,
+        visited: &mut FxHashSet<(usize, usize)>,
+    ) -> Self {
+        let (area, perimeter) = traverse(grid, col, row, visited);
 
-    fn update(&mut self, boundaries: u32) {
-        self.area += 1;
-        self.perimeter += boundaries;
+        Self { area, perimeter }
     }
+}
+
+fn traverse(
+    grid: &Vec<Vec<char>>,
+    col: usize,
+    row: usize,
+    visited: &mut FxHashSet<(usize, usize)>,
+) -> (u32, u32) {
+    if visited.contains(&(col, row)) {
+        return (0, 0);
+    }
+    let size = grid.len();
+    assert_eq!(size, grid[0].len());
+
+    let mut area = 1;
+    let mut perimeter = 0;
+    let c = grid[row][col];
+    visited.insert((col, row));
+
+    if row == 0 || grid[row - 1][col] != c {
+        perimeter += 1;
+    } else {
+        let up = traverse(grid, col, row - 1, visited);
+        area += up.0;
+        perimeter += up.1;
+    }
+    if row == size - 1 || grid[row + 1][col] != c {
+        perimeter += 1;
+    } else {
+        let down = traverse(grid, col, row + 1, visited);
+        area += down.0;
+        perimeter += down.1;
+    }
+    if col == 0 || grid[row][col - 1] != c {
+        perimeter += 1;
+    } else {
+        let left = traverse(grid, col - 1, row, visited);
+        area += left.0;
+        perimeter += left.1;
+    }
+    if col == size - 1 || grid[row][col + 1] != c {
+        perimeter += 1;
+    } else {
+        let right = traverse(grid, col + 1, row, visited);
+        area += right.0;
+        perimeter += right.1;
+    }
+    (area, perimeter)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
-    let size = grid.len();
-    assert_eq!(size, grid[0].len());
 
-    todo!("disjoint sets");
-    let mut regions = FxHashMap::default();
+    let mut regions = vec![];
+    let mut visited = FxHashSet::default();
 
-    for (row, r) in grid.iter().enumerate() {
-        for (col, &c) in r.iter().enumerate() {
-            let mut boundaries = 0;
-
-            if row == 0 || grid[row - 1][col] != c {
-                boundaries += 1;
-            }
-            if row == size - 1 || grid[row + 1][col] != c {
-                boundaries += 1;
-            }
-            if col == 0 || grid[row][col - 1] != c {
-                boundaries += 1;
-            }
-            if col == size - 1 || grid[row][col + 1] != c {
-                boundaries += 1;
-            }
-
-            println!("{} {:?} {}", c, (col, row), boundaries);
-
-            regions
-                .entry(c)
-                .and_modify(|r: &mut Region| r.update(boundaries))
-                .or_insert(Region::new(boundaries));
+    for (row, r) in grid.clone().iter().enumerate() {
+        for (col, _) in r.iter().enumerate() {
+            regions.push(Region::from(&grid, col, row, &mut visited));
         }
     }
 
-    println!("{:#?}", regions);
-
-    Some(regions.iter().map(|(_, v)| v.perimeter * v.area).sum())
+    Some(regions.iter().map(|v| v.perimeter * v.area).sum())
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
