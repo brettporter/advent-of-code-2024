@@ -1,4 +1,7 @@
-use fxhash::FxHashSet;
+use std::usize;
+
+use fxhash::{FxHashMap, FxHashSet};
+use itertools::Itertools;
 use nom::{
     character::complete::{newline, none_of},
     combinator::opt,
@@ -27,12 +30,50 @@ impl Region {
         row: usize,
         visited: &mut FxHashSet<(usize, usize)>,
     ) -> Self {
-        let (area, perimeter, corners) = traverse(grid, col, row, visited);
+        let mut vert_edges = FxHashMap::default();
+        let mut horiz_edges = FxHashMap::default();
+        let (area, perimeter) =
+            traverse(grid, col, row, visited, &mut vert_edges, &mut horiz_edges);
+
+        let mut test_perimeter = 0;
+        let mut sides = 0;
+        // TODO: reduce dupe
+        for (c, r) in &vert_edges {
+            let mut last = 1000000;
+            for &i in r.iter().sorted() {
+                test_perimeter += 1;
+                if i != last + 1 {
+                    println!("Vert Side: {c} {i} {last}");
+                    sides += 1;
+                }
+                last = i;
+            }
+        }
+        for (c, r) in &horiz_edges {
+            let mut last = 1000000;
+            for &i in r.iter().sorted() {
+                test_perimeter += 1;
+                if i != last + 1 {
+                    println!("Horiz Side: {c} {i} {last}");
+                    sides += 1;
+                }
+                last = i;
+            }
+        }
+
+        assert_eq!(test_perimeter, perimeter);
+
+        println!(
+            "From {:?} region {area} {perimeter} {sides} {:?} {:?}",
+            (col, row),
+            vert_edges,
+            horiz_edges
+        );
 
         Self {
             area,
             perimeter,
-            sides: (corners - 2) * 2,
+            sides,
         }
     }
 }
@@ -42,69 +83,63 @@ fn traverse(
     col: usize,
     row: usize,
     visited: &mut FxHashSet<(usize, usize)>,
-) -> (u32, u32, u32) {
+    vert_edges: &mut FxHashMap<usize, Vec<usize>>,
+    horiz_edges: &mut FxHashMap<usize, Vec<usize>>,
+) -> (u32, u32) {
     if visited.contains(&(col, row)) {
-        return (0, 0, 0);
+        return (0, 0);
     }
     let size = grid.len();
     assert_eq!(size, grid[0].len());
 
     let mut area = 1;
     let mut perimeter = 0;
-    let mut corners = 0;
     let c = grid[row][col];
     visited.insert((col, row));
 
-    let (mut up_edge, mut down_edge, mut left_edge, mut right_edge) = (false, false, false, false);
-
     if row == 0 || grid[row - 1][col] != c {
         perimeter += 1;
-        up_edge = true;
+        horiz_edges
+            .entry(row)
+            .and_modify(|v| v.push(col))
+            .or_insert(vec![col]);
     } else {
-        let up = traverse(grid, col, row - 1, visited);
+        let up = traverse(grid, col, row - 1, visited, vert_edges, horiz_edges);
         area += up.0;
         perimeter += up.1;
-        corners += up.2;
     }
     if row == size - 1 || grid[row + 1][col] != c {
         perimeter += 1;
-        down_edge = true;
+        horiz_edges
+            .entry(row)
+            .and_modify(|v| v.push(col))
+            .or_insert(vec![col]);
     } else {
-        let down = traverse(grid, col, row + 1, visited);
+        let down = traverse(grid, col, row + 1, visited, vert_edges, horiz_edges);
         area += down.0;
         perimeter += down.1;
-        corners += down.2;
     }
     if col == 0 || grid[row][col - 1] != c {
         perimeter += 1;
-        left_edge = true;
+        vert_edges
+            .entry(col)
+            .and_modify(|v| v.push(row))
+            .or_insert(vec![row]);
     } else {
-        let left = traverse(grid, col - 1, row, visited);
+        let left = traverse(grid, col - 1, row, visited, vert_edges, horiz_edges);
         area += left.0;
         perimeter += left.1;
-        corners += left.2;
     }
     if col == size - 1 || grid[row][col + 1] != c {
         perimeter += 1;
-        right_edge = true;
+        vert_edges
+            .entry(col)
+            .and_modify(|v| v.push(row))
+            .or_insert(vec![row]);
     } else {
-        let right = traverse(grid, col + 1, row, visited);
+        let right = traverse(grid, col + 1, row, visited, vert_edges, horiz_edges);
         area += right.0;
         perimeter += right.1;
-        corners += right.2;
-    }
-
-    if left_edge && down_edge {
-        corners += 1;
-    }
-    if left_edge && up_edge {
-        corners += 1;
-    }
-    if right_edge && down_edge {
-        corners += 1;
-    }
-    if right_edge && up_edge {
-        corners += 1;
     }
 
     // TODO: instead of corners, let's try this:
@@ -112,7 +147,10 @@ fn traverse(
     //  * sort the array for each vert coordinate and each horiz coordinate
     //  * count all for perimeter
     //  * collapse sequential items to count sides
-    (area, perimeter, corners)
+
+    // TODO: the edge exists on either side of the col, so we might need to differentiate L/R and U/D by putting it "between" the cols/rows
+
+    (area, perimeter)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
@@ -139,7 +177,7 @@ pub fn part_two(input: &str) -> Option<u32> {
     let mut visited = FxHashSet::default();
 
     for (row, r) in grid.clone().iter().enumerate() {
-        for (col, c) in r.iter().enumerate() {
+        for (col, _) in r.iter().enumerate() {
             if !visited.contains(&(col, row)) {
                 let region = Region::from(&grid, col, row, &mut visited);
                 regions.push(region);
