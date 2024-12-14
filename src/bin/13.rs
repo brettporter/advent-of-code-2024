@@ -1,8 +1,10 @@
+use itertools::Itertools;
 use nom::{
     bytes::complete::tag,
-    character::complete::{i32, newline},
+    character::complete::{i64, newline},
+    combinator::opt,
     multi::many1,
-    sequence::{pair, preceded, separated_pair, terminated, tuple},
+    sequence::{preceded, separated_pair, terminated, tuple},
     IResult, Parser,
 };
 
@@ -10,11 +12,11 @@ advent_of_code::solution!(13);
 
 #[derive(Debug)]
 struct Coord {
-    x: i32,
-    y: i32,
+    x: i64,
+    y: i64,
 }
 impl Coord {
-    fn from_tuple(t: (i32, i32)) -> Coord {
+    fn from_tuple(t: (i64, i64)) -> Coord {
         let (x, y) = t;
         Self { x, y }
     }
@@ -34,9 +36,9 @@ fn parse_input(input: &str) -> IResult<&str, Vec<ClawMachine>> {
                 preceded(
                     tag("Button A: "),
                     separated_pair(
-                        preceded(tag("X+"), i32),
+                        preceded(tag("X+"), i64),
                         tag(", "),
-                        preceded(tag("Y+"), i32),
+                        preceded(tag("Y+"), i64),
                     ),
                 ),
                 newline,
@@ -45,9 +47,9 @@ fn parse_input(input: &str) -> IResult<&str, Vec<ClawMachine>> {
                 preceded(
                     tag("Button B: "),
                     separated_pair(
-                        preceded(tag("X+"), i32),
+                        preceded(tag("X+"), i64),
                         tag(", "),
-                        preceded(tag("Y+"), i32),
+                        preceded(tag("Y+"), i64),
                     ),
                 ),
                 newline,
@@ -56,9 +58,9 @@ fn parse_input(input: &str) -> IResult<&str, Vec<ClawMachine>> {
                 preceded(
                     tag("Prize: "),
                     separated_pair(
-                        preceded(tag("X="), i32),
+                        preceded(tag("X="), i64),
                         tag(", "),
-                        preceded(tag("Y="), i32),
+                        preceded(tag("Y="), i64),
                     ),
                 ),
                 newline,
@@ -69,41 +71,61 @@ fn parse_input(input: &str) -> IResult<&str, Vec<ClawMachine>> {
             b_increment: Coord::from_tuple(b_increment),
             prize_location: Coord::from_tuple(prize_location),
         }),
-        newline,
+        opt(newline),
     ))(input)
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<u64> {
     let (_, machines) = parse_input(input).unwrap();
 
+    Some(calculate_cost(&machines, Some(100)))
+}
+
+fn calculate_cost(machines: &[ClawMachine], limit: Option<i64>) -> u64 {
     let mut total = 0;
     for machine in machines {
-        let mut cheapest = None;
-        for a in 0..=100 {
-            for b in 0..=100 {
-                if machine.a_increment.x * a + machine.b_increment.x * b == machine.prize_location.x
-                    && machine.a_increment.y * a + machine.b_increment.y * b
-                        == machine.prize_location.y
-                {
+        // Given equations:
+        //  AX * a + BX * b = PX
+        //  AY * a + BY * b = PY
+        //
+        // Calculate intersection:
+        // b = (PY * AX - AY * PX) / (BY * AX - AY * BX)
+        // a = (PX - BX * b) / AX
+        let b2 = machine.b_increment.y * machine.a_increment.x
+            - machine.a_increment.y * machine.b_increment.x;
+        let b1 = machine.prize_location.y * machine.a_increment.x
+            - machine.a_increment.y * machine.prize_location.x;
+        if b1 % b2 == 0 {
+            let b = b1 / b2;
+            let a1 = machine.prize_location.x - machine.b_increment.x * b;
+            if a1 % machine.a_increment.x == 0 {
+                let a = a1 / machine.a_increment.x;
+
+                if limit.is_none() || (a <= limit.unwrap() && b <= limit.unwrap()) {
                     let cost = a * 3 + b;
-                    if let Some(c) = cheapest {
-                        cheapest = Some(cost.min(c));
-                    } else {
-                        cheapest = Some(cost);
-                    }
+                    total += cost;
                 }
             }
         }
-        if let Some(c) = cheapest {
-            total += c;
-        }
     }
-
-    Some(total as u32)
+    total as u64
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let (_, machines) = parse_input(input).unwrap();
+
+    let machines = machines
+        .into_iter()
+        .map(|m| ClawMachine {
+            prize_location: Coord {
+                x: m.prize_location.x + 10000000000000,
+                y: m.prize_location.y + 10000000000000,
+            },
+            ..m
+        })
+        .collect_vec();
+
+    Some(calculate_cost(&machines, None))
 }
 
 #[cfg(test)]
@@ -119,6 +141,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(875318608908));
     }
 }
