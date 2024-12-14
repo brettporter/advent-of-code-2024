@@ -77,6 +77,21 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
+    let (_, mut positions) = parse_input(input).unwrap();
+
+    let expected = [[' '; 16], ['#'; 16]].concat();
+
+    for i in 0..10000 {
+        let mut grid = [[' '; 101]; 103];
+        for p in positions.iter_mut() {
+            p.update_position(101, 103);
+            grid[p.position.y as usize][p.position.x as usize] = '#';
+        }
+
+        if grid[49].starts_with(&expected) {
+            return Some(i + 1);
+        }
+    }
     None
 }
 
