@@ -1,3 +1,4 @@
+use fxhash::FxHashSet;
 use itertools::Itertools;
 use nom::{
     character::complete::{newline, one_of},
@@ -27,17 +28,6 @@ impl Entity {
             '.' => Self::Empty,
             '@' => Self::Robot,
             _ => unreachable!("Invalid input"),
-        }
-    }
-
-    fn to_char(&self) -> char {
-        match *self {
-            Self::Wall => '#',
-            Self::Box => 'O',
-            Self::BoxL => '[',
-            Self::BoxR => ']',
-            Self::Empty => '.',
-            Self::Robot => '@',
         }
     }
 
@@ -80,7 +70,7 @@ impl Direction {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Coord {
     x: usize,
     y: usize,
@@ -124,43 +114,58 @@ fn parse_input(input: &str) -> IResult<&str, (Vec<Vec<Entity>>, Vec<Direction>)>
     separated_pair(parse_map, newline, parse_moves)(input)
 }
 
-fn move_entity(
+fn move_entities(pos: &Coord, direction: &Direction, grid: &mut [Vec<Entity>]) -> Option<Coord> {
+    let mut movable = vec![];
+    let new_pos = find_movable_entities(pos, direction, grid, &mut movable, false);
+
+    if new_pos.is_some() {
+        let mut written = FxHashSet::default();
+        for (pos, next_pos, e) in movable {
+            grid[next_pos.y][next_pos.x] = e;
+            written.insert(next_pos);
+
+            if !written.contains(&pos) {
+                grid[pos.y][pos.x] = Entity::Empty;
+            }
+        }
+    }
+    new_pos
+}
+
+fn find_movable_entities(
     pos: &Coord,
     direction: &Direction,
-    grid: &mut [Vec<Entity>],
+    grid: &[Vec<Entity>],
+    moveable: &mut Vec<(Coord, Coord, Entity)>,
     is_other_half: bool,
 ) -> Option<Coord> {
     let next_pos = pos.next_position(&direction);
 
-    println!(
-        "Try moving {:?} @ {:?} {:?} -> {:?}",
-        grid[pos.y][pos.x], pos, direction, next_pos
-    );
+    if grid[next_pos.y][next_pos.x] == Entity::Wall {
+        return None;
+    }
 
     if grid[next_pos.y][next_pos.x].is_box() {
-        move_entity(&next_pos, direction, grid, false);
-    }
-
-    if grid[next_pos.y][next_pos.x] == Entity::Empty {
-        let e = grid[pos.y][pos.x];
-        if e == Entity::BoxL && direction.is_vertical() && !is_other_half {
-            let other_half = pos.next_position(&Direction::Right);
-            if move_entity(&other_half, direction, grid, true).is_none() {
-                return None;
-            }
-        } else if e == Entity::BoxR && direction.is_vertical() && !is_other_half {
-            let other_half = pos.next_position(&Direction::Left);
-            if move_entity(&other_half, direction, grid, true).is_none() {
-                return None;
-            }
+        if find_movable_entities(&next_pos, direction, grid, moveable, false).is_none() {
+            return None;
         }
-
-        grid[next_pos.y][next_pos.x] = e;
-        grid[pos.y][pos.x] = Entity::Empty;
-        Some(next_pos)
-    } else {
-        None
     }
+
+    let e = grid[pos.y][pos.x];
+    if e == Entity::BoxL && direction.is_vertical() && !is_other_half {
+        let other_half = pos.next_position(&Direction::Right);
+        if find_movable_entities(&other_half, direction, grid, moveable, true).is_none() {
+            return None;
+        }
+    } else if e == Entity::BoxR && direction.is_vertical() && !is_other_half {
+        let other_half = pos.next_position(&Direction::Left);
+        if find_movable_entities(&other_half, direction, grid, moveable, true).is_none() {
+            return None;
+        }
+    }
+
+    moveable.push((*pos, next_pos, e));
+    Some(next_pos)
 }
 
 fn find_robot(grid: &Vec<Vec<Entity>>) -> Coord {
@@ -182,7 +187,7 @@ pub fn part_one(input: &str) -> Option<u32> {
     let mut robot_pos = find_robot(&grid);
 
     for m in moves {
-        if let Some(p) = move_entity(&robot_pos, &m, &mut grid, false) {
+        if let Some(p) = move_entities(&robot_pos, &m, &mut grid) {
             robot_pos = p;
         }
     }
@@ -202,10 +207,6 @@ pub fn part_one(input: &str) -> Option<u32> {
 pub fn part_two(input: &str) -> Option<u32> {
     let (_, (grid, moves)) = parse_input(input).unwrap();
 
-    // TODO: needed?
-    let size = grid.len();
-    assert_eq!(grid[0].len(), size);
-
     let mut grid = grid
         .iter()
         .map(|row| row.iter().flat_map(|entity| entity.expand()).collect())
@@ -214,16 +215,9 @@ pub fn part_two(input: &str) -> Option<u32> {
     let mut robot_pos = find_robot(&grid);
 
     for m in moves {
-        if let Some(p) = move_entity(&robot_pos, &m, &mut grid, false) {
+        if let Some(p) = move_entities(&robot_pos, &m, &mut grid) {
             robot_pos = p;
         }
-    }
-
-    for row in &grid {
-        for col in row {
-            print!("{}", col.to_char())
-        }
-        println!();
     }
 
     let mut total = 0;
