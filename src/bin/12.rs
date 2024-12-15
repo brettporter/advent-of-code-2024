@@ -16,6 +16,14 @@ fn parse_input(input: &str) -> IResult<&str, Vec<Vec<char>>> {
     many1(terminated(many1(none_of("\n")), opt(newline)))(input)
 }
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 #[derive(Debug)]
 struct Region {
     area: u32,
@@ -35,40 +43,7 @@ impl Region {
         let (area, perimeter) =
             traverse(grid, col, row, visited, &mut vert_edges, &mut horiz_edges);
 
-        let mut test_perimeter = 0;
-        let mut sides = 0;
-        // TODO: reduce dupe
-        for (c, r) in &vert_edges {
-            let mut last = 1000000;
-            for &i in r.iter().sorted() {
-                test_perimeter += 1;
-                if i != last + 1 {
-                    println!("Vert Side: {c} {i} {last}");
-                    sides += 1;
-                }
-                last = i;
-            }
-        }
-        for (c, r) in &horiz_edges {
-            let mut last = 1000000;
-            for &i in r.iter().sorted() {
-                test_perimeter += 1;
-                if i != last + 1 {
-                    println!("Horiz Side: {c} {i} {last}");
-                    sides += 1;
-                }
-                last = i;
-            }
-        }
-
-        assert_eq!(test_perimeter, perimeter);
-
-        println!(
-            "From {:?} region {area} {perimeter} {sides} {:?} {:?}",
-            (col, row),
-            vert_edges,
-            horiz_edges
-        );
+        let sides = count_sides(&vert_edges) + count_sides(&horiz_edges);
 
         Self {
             area,
@@ -78,13 +53,27 @@ impl Region {
     }
 }
 
+fn count_sides(edges: &FxHashMap<(usize, Direction), Vec<usize>>) -> u32 {
+    let mut sides = 0;
+    for (_, r) in edges {
+        let mut last = None;
+        for &i in r.iter().sorted() {
+            if last.is_none() || i != last.unwrap() + 1 {
+                sides += 1;
+            }
+            last = Some(i);
+        }
+    }
+    sides
+}
+
 fn traverse(
     grid: &Vec<Vec<char>>,
     col: usize,
     row: usize,
     visited: &mut FxHashSet<(usize, usize)>,
-    vert_edges: &mut FxHashMap<usize, Vec<usize>>,
-    horiz_edges: &mut FxHashMap<usize, Vec<usize>>,
+    vert_edges: &mut FxHashMap<(usize, Direction), Vec<usize>>,
+    horiz_edges: &mut FxHashMap<(usize, Direction), Vec<usize>>,
 ) -> (u32, u32) {
     if visited.contains(&(col, row)) {
         return (0, 0);
@@ -100,7 +89,7 @@ fn traverse(
     if row == 0 || grid[row - 1][col] != c {
         perimeter += 1;
         horiz_edges
-            .entry(row)
+            .entry((row, Direction::Up))
             .and_modify(|v| v.push(col))
             .or_insert(vec![col]);
     } else {
@@ -111,7 +100,7 @@ fn traverse(
     if row == size - 1 || grid[row + 1][col] != c {
         perimeter += 1;
         horiz_edges
-            .entry(row)
+            .entry((row, Direction::Down))
             .and_modify(|v| v.push(col))
             .or_insert(vec![col]);
     } else {
@@ -122,7 +111,7 @@ fn traverse(
     if col == 0 || grid[row][col - 1] != c {
         perimeter += 1;
         vert_edges
-            .entry(col)
+            .entry((col, Direction::Left))
             .and_modify(|v| v.push(row))
             .or_insert(vec![row]);
     } else {
@@ -133,7 +122,7 @@ fn traverse(
     if col == size - 1 || grid[row][col + 1] != c {
         perimeter += 1;
         vert_edges
-            .entry(col)
+            .entry((col, Direction::Right))
             .and_modify(|v| v.push(row))
             .or_insert(vec![row]);
     } else {
@@ -141,14 +130,6 @@ fn traverse(
         area += right.0;
         perimeter += right.1;
     }
-
-    // TODO: instead of corners, let's try this:
-    //  * gather sides in arrays by vert (up, down) and horiz (left, right)
-    //  * sort the array for each vert coordinate and each horiz coordinate
-    //  * count all for perimeter
-    //  * collapse sequential items to count sides
-
-    // TODO: the edge exists on either side of the col, so we might need to differentiate L/R and U/D by putting it "between" the cols/rows
 
     (area, perimeter)
 }
