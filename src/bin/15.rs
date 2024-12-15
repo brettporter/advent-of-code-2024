@@ -1,4 +1,3 @@
-use fxhash::FxHashSet;
 use itertools::Itertools;
 use nom::{
     character::complete::{newline, one_of},
@@ -119,14 +118,11 @@ fn move_entities(pos: &Coord, direction: &Direction, grid: &mut [Vec<Entity>]) -
     let new_pos = find_movable_entities(pos, direction, grid, &mut movable, false);
 
     if new_pos.is_some() {
-        let mut written = FxHashSet::default();
-        for (pos, next_pos, e) in movable {
+        for (pos, _, _) in &movable {
+            grid[pos.y][pos.x] = Entity::Empty;
+        }
+        for (_, next_pos, e) in movable {
             grid[next_pos.y][next_pos.x] = e;
-            written.insert(next_pos);
-
-            if !written.contains(&pos) {
-                grid[pos.y][pos.x] = Entity::Empty;
-            }
         }
     }
     new_pos
