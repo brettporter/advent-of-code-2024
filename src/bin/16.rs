@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use fxhash::{FxHashMap, FxHashSet};
 use itertools::Itertools;
 use nom::{
@@ -169,7 +171,7 @@ pub fn part_one(input: &str) -> Option<u32> {
 
         for &(n, score_inc) in valid_options {
             let score = cost + score_inc;
-            if score < *cost_tally.get(&n).unwrap_or(&u32::MAX) {
+            if score <= *cost_tally.get(&n).unwrap_or(&u32::MAX) {
                 cost_tally.insert(n, score);
                 queue.push(n, score);
             }
@@ -180,7 +182,67 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
+    let (_, grid) = parse_input(input).unwrap();
+
+    let start = Path {
+        pos: find_item(&grid, 'S'),
+        direction: Direction::East,
+    };
+
+    let mut queue = DoublePriorityQueue::new();
+    queue.push(start, 0);
+
+    let mut cost_tally = FxHashMap::default();
+    cost_tally.insert(start, 0);
+
+    let mut prev = FxHashMap::default();
+
+    while let Some((cur_path, cost)) = queue.pop_min() {
+        if grid[cur_path.pos.1][cur_path.pos.0] == 'E' {
+            return Some(calculate_paths(cur_path, &prev));
+        }
+
+        let options = cur_path.get_scored_directions();
+        let valid_options = options
+            .iter()
+            .filter(|(path, _)| grid[path.pos.1][path.pos.0] != '#')
+            .collect_vec();
+
+        for &(n, score_inc) in valid_options {
+            let score = cost + score_inc;
+            if score <= *cost_tally.get(&n).unwrap_or(&u32::MAX) {
+                cost_tally.insert(n, score);
+                prev.entry(n)
+                    .and_modify(|v: &mut Vec<Path>| v.push(cur_path))
+                    .or_insert(vec![cur_path]);
+                queue.push(n, score);
+            }
+        }
+    }
+
     None
+}
+
+fn calculate_paths(cur_path: Path, prev: &FxHashMap<Path, Vec<Path>>) -> u32 {
+    let mut locs = FxHashSet::default();
+    let mut queue = VecDeque::new();
+    queue.push_front(&cur_path);
+
+    while let Some(mut cur) = queue.pop_front() {
+        loop {
+            locs.insert(cur.pos);
+            if let Some(v) = prev.get(&cur) {
+                for o in &v[1..] {
+                    queue.push_back(o);
+                }
+                cur = v.first().unwrap();
+            } else {
+                break;
+            }
+        }
+    }
+
+    locs.len() as u32
 }
 
 #[cfg(test)]
@@ -201,6 +263,11 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(45));
+
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 12,
+        ));
+        assert_eq!(result, Some(64));
     }
 }
