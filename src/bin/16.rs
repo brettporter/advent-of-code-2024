@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, iter};
 
 use fxhash::{FxHashMap, FxHashSet};
 use itertools::Itertools;
@@ -224,25 +224,34 @@ pub fn part_two(input: &str) -> Option<u32> {
 }
 
 fn calculate_paths(cur_path: Path, prev: &FxHashMap<Path, Vec<Path>>) -> u32 {
-    let mut locs = FxHashSet::default();
+    let mut paths = vec![];
     let mut queue = VecDeque::new();
-    queue.push_front(&cur_path);
+    queue.push_front((&cur_path, vec![]));
 
-    while let Some(mut cur) = queue.pop_front() {
+    while let Some((mut cur, mut locs)) = queue.pop_front() {
         loop {
-            locs.insert(cur.pos);
+            locs.push(cur.pos);
             if let Some(v) = prev.get(&cur) {
                 for o in &v[1..] {
-                    queue.push_back(o);
+                    queue.push_back((o, locs.clone()));
                 }
                 cur = v.first().unwrap();
             } else {
+                paths.push(locs);
                 break;
             }
         }
     }
 
-    locs.len() as u32
+    let min_length = paths.iter().map(|p| p.len()).min().unwrap();
+    let mut visited = FxHashSet::default();
+    for p in paths.iter().filter(|p| p.len() == min_length) {
+        for i in p {
+            visited.insert(i);
+        }
+    }
+
+    visited.len() as u32
 }
 
 #[cfg(test)]
