@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, iter};
+use std::collections::VecDeque;
 
 use fxhash::{FxHashMap, FxHashSet};
 use itertools::Itertools;
@@ -145,43 +145,18 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (usize, usize) {
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    let (_, grid) = parse_input(input).unwrap();
+    let (_, cost, _) = dijkstra(input);
 
-    let start = Path {
-        pos: find_item(&grid, 'S'),
-        direction: Direction::East,
-    };
-
-    let mut queue = DoublePriorityQueue::new();
-    queue.push(start, 0);
-
-    let mut cost_tally = FxHashMap::default();
-    cost_tally.insert(start, 0);
-
-    while let Some((cur_path, cost)) = queue.pop_min() {
-        if grid[cur_path.pos.1][cur_path.pos.0] == 'E' {
-            return Some(cost);
-        }
-
-        let options = cur_path.get_scored_directions();
-        let valid_options = options
-            .iter()
-            .filter(|(path, _)| grid[path.pos.1][path.pos.0] != '#')
-            .collect_vec();
-
-        for &(n, score_inc) in valid_options {
-            let score = cost + score_inc;
-            if score <= *cost_tally.get(&n).unwrap_or(&u32::MAX) {
-                cost_tally.insert(n, score);
-                queue.push(n, score);
-            }
-        }
-    }
-
-    None
+    Some(cost)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
+    let (cur_path, _, prev) = dijkstra(input);
+
+    Some(calculate_paths(cur_path, &prev))
+}
+
+fn dijkstra(input: &str) -> (Path, u32, FxHashMap<Path, Vec<Path>>) {
     let (_, grid) = parse_input(input).unwrap();
 
     let start = Path {
@@ -199,7 +174,7 @@ pub fn part_two(input: &str) -> Option<u32> {
 
     while let Some((cur_path, cost)) = queue.pop_min() {
         if grid[cur_path.pos.1][cur_path.pos.0] == 'E' {
-            return Some(calculate_paths(cur_path, &prev));
+            return (cur_path, cost, prev);
         }
 
         let options = cur_path.get_scored_directions();
@@ -220,7 +195,7 @@ pub fn part_two(input: &str) -> Option<u32> {
         }
     }
 
-    None
+    unreachable!("Did not find a path to end");
 }
 
 fn calculate_paths(cur_path: Path, prev: &FxHashMap<Path, Vec<Path>>) -> u32 {
