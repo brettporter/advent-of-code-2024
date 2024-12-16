@@ -1,6 +1,4 @@
-use std::{collections::VecDeque, u32};
-
-use fxhash::FxHashSet;
+use fxhash::{FxHashMap, FxHashSet};
 use itertools::Itertools;
 use nom::{
     character::complete::{newline, one_of},
@@ -9,10 +7,11 @@ use nom::{
     sequence::terminated,
     IResult,
 };
+use priority_queue::DoublePriorityQueue;
 
 advent_of_code::solution!(16);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 enum Direction {
     North,
     South,
@@ -20,85 +19,107 @@ enum Direction {
     West,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 struct Path {
-    score: u32,
     direction: Direction,
     pos: (usize, usize),
 }
 
 impl Path {
-    fn get_scored_directions(&self) -> [Path; 3] {
+    fn get_scored_directions(&self) -> [(Path, u32); 3] {
         let pos = self.pos;
-        let score = self.score;
         match self.direction {
             Direction::North => [
-                Path {
-                    direction: Direction::North,
-                    score: score + 1,
-                    pos: (pos.0, pos.1 - 1),
-                },
-                Path {
-                    direction: Direction::East,
-                    score: score + 1001,
-                    pos: (pos.0 + 1, pos.1),
-                },
-                Path {
-                    direction: Direction::West,
-                    score: score + 1001,
-                    pos: (pos.0 - 1, pos.1),
-                },
+                (
+                    Path {
+                        direction: Direction::North,
+                        pos: (pos.0, pos.1 - 1),
+                    },
+                    1,
+                ),
+                (
+                    Path {
+                        direction: Direction::East,
+                        pos: (pos.0 + 1, pos.1),
+                    },
+                    1001,
+                ),
+                (
+                    Path {
+                        direction: Direction::West,
+                        pos: (pos.0 - 1, pos.1),
+                    },
+                    1001,
+                ),
             ],
             Direction::South => [
-                Path {
-                    direction: Direction::South,
-                    score: score + 1,
-                    pos: (pos.0, pos.1 + 1),
-                },
-                Path {
-                    direction: Direction::East,
-                    score: score + 1001,
-                    pos: (pos.0 + 1, pos.1),
-                },
-                Path {
-                    direction: Direction::West,
-                    score: score + 1001,
-                    pos: (pos.0 - 1, pos.1),
-                },
+                (
+                    Path {
+                        direction: Direction::South,
+                        pos: (pos.0, pos.1 + 1),
+                    },
+                    1,
+                ),
+                (
+                    Path {
+                        direction: Direction::East,
+                        pos: (pos.0 + 1, pos.1),
+                    },
+                    1001,
+                ),
+                (
+                    Path {
+                        direction: Direction::West,
+                        pos: (pos.0 - 1, pos.1),
+                    },
+                    1001,
+                ),
             ],
             Direction::East => [
-                Path {
-                    direction: Direction::East,
-                    score: score + 1,
-                    pos: (pos.0 + 1, pos.1),
-                },
-                Path {
-                    direction: Direction::North,
-                    score: score + 1001,
-                    pos: (pos.0, pos.1 - 1),
-                },
-                Path {
-                    direction: Direction::South,
-                    score: score + 1001,
-                    pos: (pos.0, pos.1 + 1),
-                },
+                (
+                    Path {
+                        direction: Direction::East,
+                        pos: (pos.0 + 1, pos.1),
+                    },
+                    1,
+                ),
+                (
+                    Path {
+                        direction: Direction::North,
+                        pos: (pos.0, pos.1 - 1),
+                    },
+                    1001,
+                ),
+                (
+                    Path {
+                        direction: Direction::South,
+                        pos: (pos.0, pos.1 + 1),
+                    },
+                    1001,
+                ),
             ],
             Direction::West => [
-                Path {
-                    direction: Direction::West,
-                    score: score + 1,
-                    pos: (pos.0 - 1, pos.1),
-                },
-                Path {
-                    direction: Direction::North,
-                    score: score + 1001,
-                    pos: (pos.0, pos.1 - 1),
-                },
-                Path {
-                    direction: Direction::South,
-                    score: score + 1001,
-                    pos: (pos.0, pos.1 + 1),
-                },
+                (
+                    Path {
+                        direction: Direction::West,
+                        pos: (pos.0 - 1, pos.1),
+                    },
+                    1,
+                ),
+                (
+                    Path {
+                        direction: Direction::North,
+                        pos: (pos.0, pos.1 - 1),
+                    },
+                    1001,
+                ),
+                (
+                    Path {
+                        direction: Direction::South,
+                        pos: (pos.0, pos.1 + 1),
+                    },
+                    1001,
+                ),
             ],
         }
     }
@@ -124,67 +145,38 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (usize, usize) {
 pub fn part_one(input: &str) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
-    let start = find_item(&grid, 'S');
-    let mut best = None;
-    let mut paths = VecDeque::new();
-    let mut visited = FxHashSet::default();
-    visited.insert(start);
+    let start = Path {
+        pos: find_item(&grid, 'S'),
+        direction: Direction::East,
+    };
 
-    paths.push_front((
-        Path {
-            score: 0,
-            direction: Direction::East,
-            pos: start,
-        },
-        visited,
-    ));
+    let mut queue = DoublePriorityQueue::new();
+    queue.push(start, 0);
 
-    while let Some((p, mut visited)) = paths.pop_front() {
-        let mut cur_path = p;
-        println!("Trying {:?}", cur_path);
+    let mut cost_tally = FxHashMap::default();
+    cost_tally.insert(start, 0);
 
-        // No loop detection yet, no backtracking
-        loop {
-            if best.is_some() && cur_path.score > best.unwrap() {
-                println!("Abandon - score too high {:?}", cur_path);
-                break;
+    while let Some((cur_path, cost)) = queue.pop_min() {
+        if grid[cur_path.pos.1][cur_path.pos.0] == 'E' {
+            return Some(cost);
+        }
+
+        let options = cur_path.get_scored_directions();
+        let valid_options = options
+            .iter()
+            .filter(|(path, _)| grid[path.pos.1][path.pos.0] != '#')
+            .collect_vec();
+
+        for &(n, score_inc) in valid_options {
+            let score = cost + score_inc;
+            if score < *cost_tally.get(&n).unwrap_or(&u32::MAX) {
+                cost_tally.insert(n, score);
+                queue.push(n, score);
             }
-            visited.insert(cur_path.pos);
-
-            let options = cur_path.get_scored_directions();
-
-            let valid_options = options
-                .iter()
-                .filter(|path| grid[path.pos.1][path.pos.0] != '#' && !visited.contains(&path.pos))
-                .collect_vec();
-
-            if valid_options.len() == 0 {
-                println!(
-                    "Abandon - blocked at {:?}, options were {:?}",
-                    cur_path, options
-                );
-                break;
-            }
-
-            for &o in &valid_options[1..] {
-                paths.push_back((*o, visited.clone()));
-            }
-
-            cur_path = **valid_options.first().unwrap();
-            if grid[cur_path.pos.1][cur_path.pos.0] == 'E' {
-                println!("Found end {:?}", cur_path);
-                if let Some(b) = best {
-                    best = Some(b.min(cur_path.score));
-                } else {
-                    best = Some(cur_path.score);
-                }
-                break;
-            }
-            println!("Moving to {:?}", cur_path);
         }
     }
 
-    best
+    None
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
