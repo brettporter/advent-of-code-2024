@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use nom::{
     bytes::complete::tag,
-    character::complete::{newline, u128, u8}, // TODO: need 128?
+    character::complete::{newline, u64, u8},
     multi::separated_list1,
     sequence::{preceded, separated_pair, terminated, tuple},
     IResult,
@@ -10,9 +10,9 @@ use nom::{
 advent_of_code::solution!(17);
 
 struct MachineState {
-    a: u128,
-    b: u128,
-    c: u128,
+    a: u64,
+    b: u64,
+    c: u64,
     code: Vec<u8>,
 }
 impl MachineState {
@@ -31,7 +31,7 @@ impl MachineState {
                 }
                 1 => {
                     // bxl
-                    self.b = self.b ^ (operand as u128);
+                    self.b = self.b ^ (operand as u64);
                 }
                 2 => {
                     // bst
@@ -65,10 +65,9 @@ impl MachineState {
         output.join(",")
     }
 
-    // TODO: check type
-    fn get_combo_operand(&self, operand: u8) -> u128 {
+    fn get_combo_operand(&self, operand: u8) -> u64 {
         match operand {
-            0..=3 => operand as u128,
+            0..=3 => operand as u64,
             4 => self.a,
             5 => self.b,
             6 => self.c,
@@ -77,17 +76,17 @@ impl MachineState {
         }
     }
 
-    fn perform_dv(&self, operand: u8) -> u128 {
-        self.a / (1 << self.get_combo_operand(operand))
+    fn perform_dv(&self, operand: u8) -> u64 {
+        self.a >> self.get_combo_operand(operand)
     }
 }
 
-fn parse_input(input: &str) -> IResult<&str, ((u128, u128, u128), Vec<u8>)> {
-    fn parse_registers(input: &str) -> IResult<&str, (u128, u128, u128)> {
+fn parse_input(input: &str) -> IResult<&str, ((u64, u64, u64), Vec<u8>)> {
+    fn parse_registers(input: &str) -> IResult<&str, (u64, u64, u64)> {
         tuple((
-            terminated(preceded(tag("Register A: "), u128), newline),
-            terminated(preceded(tag("Register B: "), u128), newline),
-            terminated(preceded(tag("Register C: "), u128), newline),
+            terminated(preceded(tag("Register A: "), u64), newline),
+            terminated(preceded(tag("Register B: "), u64), newline),
+            terminated(preceded(tag("Register C: "), u64), newline),
         ))(input)
     }
 
@@ -104,23 +103,29 @@ pub fn part_one(input: &str) -> Option<String> {
     Some(machine_state.run())
 }
 
-pub fn part_two(input: &str) -> Option<u128> {
+pub fn part_two(input: &str) -> Option<u64> {
     let (_, ((a, b, c), code)) = parse_input(input).unwrap();
     let expected_output = code.iter().map(u8::to_string).join(",");
     let mut machine_state = MachineState { a, b, c, code };
 
-    let min = 8u128.pow(machine_state.code.len() as u32 - 2) * 7;
-    let max = min * 8;
+    let mut desired_a = 0;
 
-    for i in min..max {
-        machine_state.a = i;
-        let out = machine_state.run();
-        println!("{out}");
-        if out == expected_output {
-            return Some(i);
+    for x in 0..=expected_output.len() / 2 {
+        let expected = &expected_output[expected_output.len() - 1 - x * 2..];
+        let mut found = false;
+        for i in 0..64 {
+            let next_a = desired_a * 8 + i;
+            machine_state.a = next_a;
+            let out = machine_state.run();
+            if out == expected {
+                desired_a = next_a;
+                found = true;
+                break;
+            }
         }
+        assert!(found);
     }
-    None
+    Some(desired_a)
 }
 
 #[cfg(test)]
