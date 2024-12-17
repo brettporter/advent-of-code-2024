@@ -1,6 +1,7 @@
+use itertools::Itertools;
 use nom::{
     bytes::complete::tag,
-    character::complete::{i32, newline, u8},
+    character::complete::{newline, u128, u8}, // TODO: need 128?
     multi::separated_list1,
     sequence::{preceded, separated_pair, terminated, tuple},
     IResult,
@@ -9,9 +10,9 @@ use nom::{
 advent_of_code::solution!(17);
 
 struct MachineState {
-    a: i32,
-    b: i32,
-    c: i32,
+    a: u128,
+    b: u128,
+    c: u128,
     code: Vec<u8>,
 }
 impl MachineState {
@@ -30,7 +31,7 @@ impl MachineState {
                 }
                 1 => {
                     // bxl
-                    self.b = self.b ^ (operand as i32);
+                    self.b = self.b ^ (operand as u128);
                 }
                 2 => {
                     // bst
@@ -58,16 +59,16 @@ impl MachineState {
                     // cdv
                     self.c = self.perform_dv(operand);
                 }
-                _ => todo!("Command {cmd} not implemented"),
+                _ => unreachable!("Command {cmd} not implemented"),
             }
         }
         output.join(",")
     }
 
     // TODO: check type
-    fn get_combo_operand(&self, operand: u8) -> i32 {
+    fn get_combo_operand(&self, operand: u8) -> u128 {
         match operand {
-            0..=3 => operand as i32,
+            0..=3 => operand as u128,
             4 => self.a,
             5 => self.b,
             6 => self.c,
@@ -76,17 +77,17 @@ impl MachineState {
         }
     }
 
-    fn perform_dv(&self, operand: u8) -> i32 {
+    fn perform_dv(&self, operand: u8) -> u128 {
         self.a / (1 << self.get_combo_operand(operand))
     }
 }
 
-fn parse_input(input: &str) -> IResult<&str, ((i32, i32, i32), Vec<u8>)> {
-    fn parse_registers(input: &str) -> IResult<&str, (i32, i32, i32)> {
+fn parse_input(input: &str) -> IResult<&str, ((u128, u128, u128), Vec<u8>)> {
+    fn parse_registers(input: &str) -> IResult<&str, (u128, u128, u128)> {
         tuple((
-            terminated(preceded(tag("Register A: "), i32), newline),
-            terminated(preceded(tag("Register B: "), i32), newline),
-            terminated(preceded(tag("Register C: "), i32), newline),
+            terminated(preceded(tag("Register A: "), u128), newline),
+            terminated(preceded(tag("Register B: "), u128), newline),
+            terminated(preceded(tag("Register C: "), u128), newline),
         ))(input)
     }
 
@@ -103,7 +104,22 @@ pub fn part_one(input: &str) -> Option<String> {
     Some(machine_state.run())
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(input: &str) -> Option<u128> {
+    let (_, ((a, b, c), code)) = parse_input(input).unwrap();
+    let expected_output = code.iter().map(u8::to_string).join(",");
+    let mut machine_state = MachineState { a, b, c, code };
+
+    let min = 8u128.pow(machine_state.code.len() as u32 - 2) * 7;
+    let max = min * 8;
+
+    for i in min..max {
+        machine_state.a = i;
+        let out = machine_state.run();
+        println!("{out}");
+        if out == expected_output {
+            return Some(i);
+        }
+    }
     None
 }
 
@@ -158,8 +174,6 @@ mod tests {
         };
         machine_state.run();
         assert_eq!(44354, machine_state.b);
-
-        // TODO: check all operations tested
     }
 
     #[test]
@@ -170,7 +184,9 @@ mod tests {
 
     #[test]
     fn test_part_two() {
-        let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 2,
+        ));
+        assert_eq!(result, Some(117440));
     }
 }
