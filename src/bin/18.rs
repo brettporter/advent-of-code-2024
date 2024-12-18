@@ -99,20 +99,24 @@ fn part_one_with_size(input: &str, num_entries: usize, size: usize) -> Option<u3
 fn part_two_with_size(input: &str, num_entries: usize, size: usize) -> Option<String> {
     let (_, coordinates) = parse_input(input).unwrap();
 
-    let mut grid = simulate_corruption(&coordinates[..num_entries], size);
+    let grid = simulate_corruption(&coordinates[..num_entries], size);
 
     let start = (0, 0);
     let end = (size - 1, size - 1);
 
-    for &(x, y) in &coordinates[num_entries..] {
-        grid[y as usize][x as usize] = true;
+    let possible_coords = coordinates[num_entries..].iter().enumerate().collect_vec();
 
-        if dijkstra(&grid, start, end).is_none() {
-            return Some(format!("{x},{y}"));
+    let p = possible_coords.partition_point(|&(idx, _)| {
+        let mut g = grid.clone();
+        for (_, &(x, y)) in &possible_coords[..=idx] {
+            g[y as usize][x as usize] = true;
         }
-    }
 
-    None
+        dijkstra(&g, start, end).is_some()
+    });
+
+    let (_, &(x, y)) = possible_coords[p];
+    Some(format!("{},{}", x, y))
 }
 
 pub fn part_two(input: &str) -> Option<String> {
