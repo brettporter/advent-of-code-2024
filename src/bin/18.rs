@@ -16,11 +16,7 @@ fn parse_input(input: &str) -> IResult<&str, Vec<(i32, i32)>> {
     many1(terminated(separated_pair(i32, tag(","), i32), opt(newline)))(input)
 }
 
-fn simulate_corruption(input: &str, num_entries: usize, size: usize) -> Vec<Vec<bool>> {
-    let (_, coordinates) = parse_input(input).unwrap();
-
-    let coordinates = &coordinates[0..num_entries];
-
+fn simulate_corruption(coordinates: &[(i32, i32)], size: usize) -> Vec<Vec<bool>> {
     let mut row = Vec::with_capacity(size);
     row.resize(size, false);
 
@@ -36,7 +32,7 @@ fn simulate_corruption(input: &str, num_entries: usize, size: usize) -> Vec<Vec<
     grid
 }
 
-fn dijkstra(grid: &Vec<Vec<bool>>, start: (usize, usize), end: (usize, usize)) -> u32 {
+fn dijkstra(grid: &Vec<Vec<bool>>, start: (usize, usize), end: (usize, usize)) -> Option<u32> {
     let size = grid.len();
 
     let mut queue = DoublePriorityQueue::new();
@@ -47,7 +43,7 @@ fn dijkstra(grid: &Vec<Vec<bool>>, start: (usize, usize), end: (usize, usize)) -
 
     while let Some((cur_pos, cost)) = queue.pop_min() {
         if cur_pos == end {
-            return cost;
+            return Some(cost);
         }
 
         let options = get_options(cur_pos, size);
@@ -65,7 +61,7 @@ fn dijkstra(grid: &Vec<Vec<bool>>, start: (usize, usize), end: (usize, usize)) -
         }
     }
 
-    unreachable!("Did not find a path to end");
+    None
 }
 
 fn get_options(pos: (usize, usize), size: usize) -> Vec<(usize, usize)> {
@@ -90,18 +86,37 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 fn part_one_with_size(input: &str, num_entries: usize, size: usize) -> Option<u32> {
-    let grid = simulate_corruption(input, num_entries, size);
+    let (_, coordinates) = parse_input(input).unwrap();
+
+    let grid = simulate_corruption(&coordinates[..num_entries], size);
 
     let start = (0, 0);
     let end = (size - 1, size - 1);
 
-    let cost = dijkstra(&grid, start, end);
-
-    Some(cost)
+    dijkstra(&grid, start, end)
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+fn part_two_with_size(input: &str, num_entries: usize, size: usize) -> Option<String> {
+    let (_, coordinates) = parse_input(input).unwrap();
+
+    let mut grid = simulate_corruption(&coordinates[..num_entries], size);
+
+    let start = (0, 0);
+    let end = (size - 1, size - 1);
+
+    for &(x, y) in &coordinates[num_entries..] {
+        grid[y as usize][x as usize] = true;
+
+        if dijkstra(&grid, start, end).is_none() {
+            return Some(format!("{x},{y}"));
+        }
+    }
+
     None
+}
+
+pub fn part_two(input: &str) -> Option<String> {
+    part_two_with_size(input, 1024, 71)
 }
 
 #[cfg(test)]
@@ -117,7 +132,8 @@ mod tests {
 
     #[test]
     fn test_part_two() {
-        let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        let result =
+            part_two_with_size(&advent_of_code::template::read_file("examples", DAY), 12, 7);
+        assert_eq!(result, Some("6,1".to_string()));
     }
 }
