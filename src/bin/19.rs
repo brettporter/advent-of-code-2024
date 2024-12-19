@@ -25,7 +25,7 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(
         designs
             .iter()
-            .filter(|d| get_possible_designs(d, &patterns, &mut cache) > 0)
+            .filter(|d| get_possible_designs(d, &patterns, false, &mut cache) > 0)
             .count() as u32,
     )
 }
@@ -33,6 +33,7 @@ pub fn part_one(input: &str) -> Option<u32> {
 fn get_possible_designs(
     design: &str,
     patterns: &Vec<&str>,
+    all: bool,
     cache: &mut FxHashMap<String, u64>,
 ) -> u64 {
     if design.is_empty() {
@@ -45,7 +46,11 @@ fn get_possible_designs(
     let mut total = 0;
     for p in patterns {
         if design.starts_with(p) {
-            total += get_possible_designs(&design[p.len()..], patterns, cache);
+            total += get_possible_designs(&design[p.len()..], patterns, all, cache);
+            if !all && total > 0 {
+                cache.insert(design.to_string(), 1);
+                return 1;
+            }
         }
     }
 
@@ -61,7 +66,7 @@ pub fn part_two(input: &str) -> Option<u64> {
     Some(
         designs
             .iter()
-            .map(|d| get_possible_designs(d, &patterns, &mut cache))
+            .map(|d| get_possible_designs(d, &patterns, true, &mut cache))
             .sum(),
     )
 }
