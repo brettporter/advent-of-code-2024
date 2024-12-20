@@ -26,7 +26,7 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (i32, i32) {
         .unwrap()
 }
 
-fn find_cheats(input: &str, max_length: i32, limit: i32) -> Option<u32> {
+fn find_cheats(input: &str, max_length: u32, limit: i32) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
     let size = grid.len() as i32;
@@ -65,33 +65,26 @@ fn find_cheats(input: &str, max_length: i32, limit: i32) -> Option<u32> {
 
     // Assemble all valid cheats
     // Re-walk the path, and at each location, find all the destination locations that can be reached
-    // in the given number of picoseconds that is not a wall by trying each possible combination of
-    // x & y that add to 20 in each quadrant surrounding this point
-    // If that location is on the path, save that cheat along with its time saving, which is the distance
-    // on the path between them, less the time spent executing the cheat
-    let mut cheats = FxHashMap::default();
-    for p in path {
-        for dy in 0..=max_length {
-            for dx in 0..=(max_length - dy) {
-                for quadrant in [(dx, dy), (dx, -dy), (-dx, dy), (-dx, -dy)] {
-                    let cheat_pos = (p.0 + quadrant.0, p.1 + quadrant.1);
-                    let cheat_length = dx + dy;
-                    assert!(cheat_length <= max_length);
-                    if cheat_length > 0 {
-                        if let Some(v) = path_nodes.get(&cheat_pos) {
-                            let saving = v - path_nodes.get(&p).unwrap() - cheat_length;
-                            if saving > 0 {
-                                cheats.insert((p, cheat_pos), saving);
-                            }
-                        }
-                    }
+    // in the given number of picoseconds that is not a wall by trying each subsequent destination on the path
+    // that is reachable by that cheat length
+    let mut count = 0;
+    for (i, p1) in path.iter().enumerate() {
+        for p2 in &path[i + 1..] {
+            let cheat_length = p1.0.abs_diff(p2.0) + p1.1.abs_diff(p2.1);
+            if cheat_length <= max_length {
+                let d1 = path_nodes[&p1];
+                let d2 = path_nodes[&p2];
+                assert!(d2 > d1);
+                let saving = d2 - d1 - cheat_length as i32;
+                // Return the number of cheats that save the specified amount of time
+                if saving >= limit {
+                    count += 1;
                 }
             }
         }
     }
 
-    // Return the number of cheats that save the specified amount of time
-    Some(cheats.values().filter(|&&v| v >= limit).count() as u32)
+    Some(count)
 }
 
 fn part_one_with_limit(input: &str, limit: i32) -> Option<u32> {
