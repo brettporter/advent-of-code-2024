@@ -27,11 +27,11 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (i32, i32) {
         .unwrap()
 }
 
-fn part_one_with_limit(input: &str, limit: i32) -> Option<u32> {
+fn find_cheats(input: &str, max_length: i32, limit: i32) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
-    let size = grid.len() as i32;
-    assert_eq!(grid[0].len() as i32, size);
+    assert_eq!(grid[0].len(), grid.len());
+
     let start = find_item(&grid, 'S');
 
     // Navigate S -> E and save the distance from start, will use this repeat with cheats
@@ -47,12 +47,7 @@ fn part_one_with_limit(input: &str, limit: i32) -> Option<u32> {
             .iter()
             .filter(|&&p| {
                 let next_pos = (pos.0 + p.0, pos.1 + p.1);
-                next_pos != last
-                    && next_pos.0 >= 0
-                    && next_pos.0 < size
-                    && next_pos.1 >= 0
-                    && next_pos.1 < size
-                    && grid[next_pos.1 as usize][next_pos.0 as usize] != '#'
+                next_pos != last && valid_pos(next_pos, &grid)
             })
             .collect_vec();
 
@@ -73,36 +68,50 @@ fn part_one_with_limit(input: &str, limit: i32) -> Option<u32> {
 
     let mut cheats = FxHashMap::default();
     for p in path {
-        // Only makes sense to make moves in the same direction
-        for (dx, dy) in [(0, 2), (0, -2), (2, 0), (-2, 0)] {
-            let cheat_pos = (p.0 + dx, p.1 + dy);
-
-            if let Some(v) = path_nodes.get(&cheat_pos) {
-                let saving = v - path_nodes.get(&p).unwrap() - 2;
-                if saving > 0 {
-                    cheats
-                        .entry(saving)
-                        .and_modify(|num| *num += 1)
-                        .or_insert(1);
+        for dy in 0..=max_length {
+            for dx in 0..=(max_length - dy) {
+                for quadrant in [(dx, dy), (dx, -dy), (-dx, dy), (-dx, -dy)] {
+                    let cheat_pos = (p.0 + quadrant.0, p.1 + quadrant.1);
+                    let cheat_length = dx + dy;
+                    assert!(cheat_length <= max_length);
+                    if cheat_length > 0 {
+                        if let Some(v) = path_nodes.get(&cheat_pos) {
+                            let saving = v - path_nodes.get(&p).unwrap() - cheat_length;
+                            if saving > 0 {
+                                cheats.insert((p, cheat_pos), saving);
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    Some(
-        cheats
-            .iter()
-            .map(|(&k, &v)| if k >= limit { v } else { 0 })
-            .sum(),
-    )
+    Some(cheats.values().filter(|&&v| v >= limit).count() as u32)
+}
+
+fn valid_pos(pos: (i32, i32), grid: &[Vec<char>]) -> bool {
+    pos.0 >= 0
+        && pos.0 < grid.len() as i32
+        && pos.1 >= 0
+        && pos.1 < grid.len() as i32
+        && grid[pos.1 as usize][pos.0 as usize] != '#'
+}
+
+fn part_one_with_limit(input: &str, limit: i32) -> Option<u32> {
+    find_cheats(input, 2, limit)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
     part_one_with_limit(input, 100)
 }
 
+pub fn part_two_with_limit(input: &str, limit: i32) -> Option<u32> {
+    find_cheats(input, 20, limit)
+}
+
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    part_two_with_limit(input, 100)
 }
 
 #[cfg(test)]
@@ -117,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_part_two() {
-        let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        let result = part_two_with_limit(&advent_of_code::template::read_file("examples", DAY), 50);
+        assert_eq!(result, Some(285));
     }
 }
