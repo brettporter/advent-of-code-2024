@@ -27,7 +27,7 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (i32, i32) {
         .unwrap()
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
+fn part_one_with_limit(input: &str, limit: i32) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
     let size = grid.len() as i32;
@@ -92,9 +92,13 @@ pub fn part_one(input: &str) -> Option<u32> {
     Some(
         cheats
             .iter()
-            .map(|(&k, &v)| if k >= 100 { v } else { 0 })
+            .map(|(&k, &v)| if k >= limit { v } else { 0 })
             .sum(),
     )
+}
+
+pub fn part_one(input: &str) -> Option<u32> {
+    part_one_with_limit(input, 100)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
@@ -107,8 +111,8 @@ mod tests {
 
     #[test]
     fn test_part_one() {
-        let result = part_one(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, Some(0));
+        let result = part_one_with_limit(&advent_of_code::template::read_file("examples", DAY), 1);
+        assert_eq!(result, Some(44));
     }
 
     #[test]
