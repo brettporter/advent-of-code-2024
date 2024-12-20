@@ -28,9 +28,6 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (i32, i32) {
 fn find_cheats(input: &str, max_length: u32, limit: usize) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
-    let size = grid.len() as i32;
-    assert_eq!(grid[0].len() as i32, size);
-
     let start = find_item(&grid, 'S');
 
     // Navigate S -> E and save the distance from start, will use this repeat with cheats
