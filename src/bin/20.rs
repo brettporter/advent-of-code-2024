@@ -1,4 +1,3 @@
-use fxhash::FxHashMap;
 use nom::{
     character::complete::{newline, one_of},
     combinator::opt,
@@ -26,7 +25,7 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (i32, i32) {
         .unwrap()
 }
 
-fn find_cheats(input: &str, max_length: u32, limit: i32) -> Option<u32> {
+fn find_cheats(input: &str, max_length: u32, limit: usize) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
     let size = grid.len() as i32;
@@ -38,7 +37,6 @@ fn find_cheats(input: &str, max_length: u32, limit: i32) -> Option<u32> {
 
     let mut pos = start;
     let mut last = start;
-    let mut path_nodes = FxHashMap::from_iter([(start, 0)]);
     let mut path = vec![start];
 
     // Traverse the main path, which we know there is only a single end to end solution
@@ -48,36 +46,25 @@ fn find_cheats(input: &str, max_length: u32, limit: i32) -> Option<u32> {
             .iter()
             .find(|&&p| {
                 let next_pos = (pos.0 + p.0, pos.1 + p.1);
-                next_pos != last
-                    && next_pos.0 >= 0
-                    && next_pos.0 < size
-                    && next_pos.1 >= 0
-                    && next_pos.1 < size
-                    && grid[next_pos.1 as usize][next_pos.0 as usize] != '#'
+                next_pos != last && grid[next_pos.1 as usize][next_pos.0 as usize] != '#'
             })
             .unwrap();
 
         last = pos;
         pos = (pos.0 + dx, pos.1 + dy);
-        path_nodes.insert(pos, path_nodes.len() as i32);
         path.push(pos);
     }
 
     // Assemble all valid cheats
     // Re-walk the path, and at each location, find all the destination locations that can be reached
-    // in the given number of picoseconds that is not a wall by trying each subsequent destination on the path
-    // that is reachable by that cheat length
+    // in the given number of picoseconds by trying each subsequent destination on the path
+    // that is reachable within cheat length
     let mut count = 0;
     for (i, p1) in path.iter().enumerate() {
-        for p2 in &path[i + 1..] {
-            let cheat_length = p1.0.abs_diff(p2.0) + p1.1.abs_diff(p2.1);
-            if cheat_length <= max_length {
-                let d1 = path_nodes[&p1];
-                let d2 = path_nodes[&p2];
-                assert!(d2 > d1);
-                let saving = d2 - d1 - cheat_length as i32;
-                // Return the number of cheats that save the specified amount of time
-                if saving >= limit {
+        if i + limit < path.len() {
+            for (j, p2) in path[i + limit..].iter().enumerate() {
+                let cheat_length = p1.0.abs_diff(p2.0) + p1.1.abs_diff(p2.1);
+                if cheat_length <= max_length && j >= cheat_length as usize {
                     count += 1;
                 }
             }
@@ -87,7 +74,7 @@ fn find_cheats(input: &str, max_length: u32, limit: i32) -> Option<u32> {
     Some(count)
 }
 
-fn part_one_with_limit(input: &str, limit: i32) -> Option<u32> {
+fn part_one_with_limit(input: &str, limit: usize) -> Option<u32> {
     find_cheats(input, 2, limit)
 }
 
@@ -95,7 +82,7 @@ pub fn part_one(input: &str) -> Option<u32> {
     part_one_with_limit(input, 100)
 }
 
-pub fn part_two_with_limit(input: &str, limit: i32) -> Option<u32> {
+pub fn part_two_with_limit(input: &str, limit: usize) -> Option<u32> {
     find_cheats(input, 20, limit)
 }
 
