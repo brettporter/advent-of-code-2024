@@ -1,3 +1,4 @@
+use fxhash::FxHashMap;
 use nom::{
     character::complete::{newline, one_of},
     combinator::opt,
@@ -25,7 +26,29 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (i32, i32) {
         .unwrap()
 }
 
-fn find_cheats(input: &str, max_length: u32, limit: usize) -> Option<u32> {
+fn find_cheats_local_strategy(input: &str, limit: usize) -> Option<u32> {
+    let path = build_path(input);
+
+    let mut count = 0;
+    let path_positions = FxHashMap::from_iter(path.iter().enumerate().map(|(i, p)| (p, i)));
+
+    for (i, p) in path.iter().enumerate() {
+        // Only makes sense to make moves in the same direction
+        for (dx, dy) in [(0, 2), (0, -2), (2, 0), (-2, 0)] {
+            let cheat_pos = (p.0 + dx, p.1 + dy);
+
+            if let Some(&v) = path_positions.get(&cheat_pos) {
+                if v >= i + limit + 2 {
+                    count += 1;
+                }
+            }
+        }
+    }
+
+    Some(count)
+}
+
+fn build_path(input: &str) -> Vec<(i32, i32)> {
     let (_, grid) = parse_input(input).unwrap();
 
     let start = find_item(&grid, 'S');
@@ -51,6 +74,11 @@ fn find_cheats(input: &str, max_length: u32, limit: usize) -> Option<u32> {
         pos = (pos.0 + dx, pos.1 + dy);
         path.push(pos);
     }
+    path
+}
+
+fn find_cheats_path_strategy(input: &str, max_length: u32, limit: usize) -> Option<u32> {
+    let path = build_path(input);
 
     // Assemble all valid cheats
     // Re-walk the path, and at each location, find all the destination locations that can be reached
@@ -72,7 +100,7 @@ fn find_cheats(input: &str, max_length: u32, limit: usize) -> Option<u32> {
 }
 
 fn part_one_with_limit(input: &str, limit: usize) -> Option<u32> {
-    find_cheats(input, 2, limit)
+    find_cheats_local_strategy(input, limit)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
@@ -80,7 +108,7 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two_with_limit(input: &str, limit: usize) -> Option<u32> {
-    find_cheats(input, 20, limit)
+    find_cheats_path_strategy(input, 20, limit)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
