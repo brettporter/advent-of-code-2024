@@ -1,5 +1,4 @@
 use fxhash::FxHashMap;
-use itertools::Itertools;
 use nom::{
     character::complete::{newline, one_of},
     combinator::opt,
@@ -30,7 +29,8 @@ fn find_item(grid: &Vec<Vec<char>>, item: char) -> (i32, i32) {
 fn find_cheats(input: &str, max_length: i32, limit: i32) -> Option<u32> {
     let (_, grid) = parse_input(input).unwrap();
 
-    assert_eq!(grid[0].len(), grid.len());
+    let size = grid.len() as i32;
+    assert_eq!(grid[0].len() as i32, size);
 
     let start = find_item(&grid, 'S');
 
@@ -41,31 +41,34 @@ fn find_cheats(input: &str, max_length: i32, limit: i32) -> Option<u32> {
     let mut path_nodes = FxHashMap::from_iter([(start, 0)]);
     let mut path = vec![start];
 
+    // Traverse the main path, which we know there is only a single end to end solution
+    // Collect into a path to walk, and map each location to its distance
     while grid[pos.1 as usize][pos.0 as usize] != 'E' {
-        // TODO: use find instead
-        let options = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        let (dx, dy) = [(0, 1), (0, -1), (1, 0), (-1, 0)]
             .iter()
-            .filter(|&&p| {
+            .find(|&&p| {
                 let next_pos = (pos.0 + p.0, pos.1 + p.1);
-                next_pos != last && valid_pos(next_pos, &grid)
+                next_pos != last
+                    && next_pos.0 >= 0
+                    && next_pos.0 < size
+                    && next_pos.1 >= 0
+                    && next_pos.1 < size
+                    && grid[next_pos.1 as usize][next_pos.0 as usize] != '#'
             })
-            .collect_vec();
+            .unwrap();
 
-        assert!(options.len() == 1);
         last = pos;
-        let (dx, dy) = options.first().unwrap();
         pos = (pos.0 + dx, pos.1 + dy);
         path_nodes.insert(pos, path_nodes.len() as i32);
         path.push(pos);
     }
 
-    let total_distance = path.len();
-
-    assert_eq!(
-        total_distance,
-        input.chars().filter(|&c| c == '.').count() + 2
-    );
-
+    // Assemble all valid cheats
+    // Re-walk the path, and at each location, find all the destination locations that can be reached
+    // in the given number of picoseconds that is not a wall by trying each possible combination of
+    // x & y that add to 20 in each quadrant surrounding this point
+    // If that location is on the path, save that cheat along with its time saving, which is the distance
+    // on the path between them, less the time spent executing the cheat
     let mut cheats = FxHashMap::default();
     for p in path {
         for dy in 0..=max_length {
@@ -87,15 +90,8 @@ fn find_cheats(input: &str, max_length: i32, limit: i32) -> Option<u32> {
         }
     }
 
+    // Return the number of cheats that save the specified amount of time
     Some(cheats.values().filter(|&&v| v >= limit).count() as u32)
-}
-
-fn valid_pos(pos: (i32, i32), grid: &[Vec<char>]) -> bool {
-    pos.0 >= 0
-        && pos.0 < grid.len() as i32
-        && pos.1 >= 0
-        && pos.1 < grid.len() as i32
-        && grid[pos.1 as usize][pos.0 as usize] != '#'
 }
 
 fn part_one_with_limit(input: &str, limit: i32) -> Option<u32> {
