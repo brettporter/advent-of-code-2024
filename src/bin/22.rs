@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use fxhash::FxHashMap;
 use nom::{
     character::complete::{i64, newline},
@@ -32,12 +30,12 @@ pub fn part_two(input: &str) -> Option<i64> {
         .max()
 }
 
-fn generate_buyer_sequences(buyers: Vec<i64>) -> FxHashMap<Vec<i64>, HashMap<usize, i64>> {
+fn generate_buyer_sequences(buyers: Vec<i64>) -> FxHashMap<Vec<i64>, FxHashMap<usize, i64>> {
     let mut sequences = FxHashMap::default();
     for (buyer_idx, &seed) in buyers.iter().enumerate() {
         let mut secret = seed;
         let mut bananas = secret % 10;
-        let mut changes = vec![];
+        let mut changes = Vec::with_capacity(2000);
         for _ in 0..2000 {
             secret = next_secret(secret);
             let next = secret % 10;
@@ -48,12 +46,12 @@ fn generate_buyer_sequences(buyers: Vec<i64>) -> FxHashMap<Vec<i64>, HashMap<usi
                 let seq = changes[changes.len() - 4..].to_vec();
                 sequences
                     .entry(seq)
-                    .and_modify(|v: &mut HashMap<usize, i64>| {
+                    .and_modify(|v: &mut FxHashMap<usize, i64>| {
                         if !v.contains_key(&buyer_idx) {
                             v.insert(buyer_idx, bananas);
                         }
                     })
-                    .or_insert_with(|| HashMap::from_iter([(buyer_idx, bananas)]));
+                    .or_insert_with(|| FxHashMap::from_iter([(buyer_idx, bananas)]));
             }
         }
     }
@@ -113,12 +111,12 @@ mod tests {
     #[test]
     fn test_generate_buyer_sequnces() {
         let seq = generate_buyer_sequences(vec![123]);
-        assert_eq!(seq[&vec![-1, -1, 0, 2]], HashMap::from([(0, 6)]));
+        assert_eq!(seq[&vec![-1, -1, 0, 2]], FxHashMap::from_iter([(0, 6)]));
 
         let seq = generate_buyer_sequences(vec![1, 2, 3, 2024]);
         assert_eq!(
             seq[&vec![-2, 1, -1, 3]],
-            HashMap::from([(0, 7), (1, 7), (3, 9)])
+            FxHashMap::from_iter([(0, 7), (1, 7), (3, 9)])
         );
     }
 
