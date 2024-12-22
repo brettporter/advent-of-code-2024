@@ -1,4 +1,4 @@
-use std::{collections::HashMap, usize};
+use std::collections::HashMap;
 
 use fxhash::FxHashMap;
 use itertools::Itertools;
@@ -89,20 +89,13 @@ fn process_robots(input: &str, num_robots: usize) -> Option<u64> {
     let mut total = 0;
     // We need to go depth first, we can more effectively cache results when there is a large number of elements to iterate
     for code in codes {
-        // TODO: reduce duplicate code
-        let mut prev_key = 'A';
-        let mut best_seq_length = 0;
-        for &key in &code {
-            let options = &numeric_map[&(prev_key, key)];
-
-            best_seq_length += options
-                .iter()
-                .map(|option| calculate_score(option, num_robots, &direction_map, &mut cache))
-                .min()
-                .unwrap();
-
-            prev_key = key;
-        }
+        let best_seq_length = calculate_score(
+            &code.iter().collect(),
+            num_robots + 1,
+            &numeric_map,
+            &direction_map,
+            &mut cache,
+        );
 
         let code_number = code[..code.len() - 1]
             .iter()
@@ -118,7 +111,8 @@ fn process_robots(input: &str, num_robots: usize) -> Option<u64> {
 fn calculate_score(
     code: &String,
     depth: usize,
-    direction_map: &HashMap<(char, char), Vec<String>>,
+    layout: &HashMap<(char, char), Vec<String>>,
+    directional_map: &HashMap<(char, char), Vec<String>>,
     cache: &mut FxHashMap<(String, usize), usize>,
 ) -> usize {
     if depth == 0 {
@@ -133,11 +127,13 @@ fn calculate_score(
     let mut prev_key = 'A';
     let mut best_seq_length = 0;
     for key in code.chars() {
-        let options = &direction_map[&(prev_key, key)];
+        let options = &layout[&(prev_key, key)];
 
         best_seq_length += options
             .iter()
-            .map(|option| calculate_score(option, depth - 1, direction_map, cache))
+            .map(|option| {
+                calculate_score(option, depth - 1, directional_map, directional_map, cache)
+            })
             .min()
             .unwrap();
 
@@ -236,7 +232,6 @@ fn map_key_moves(
         for (&to, v) in to_map {
             let cost = v[0].len();
             assert!(v.iter().all(|i| i.len() == cost));
-            // TODO: probably don't need this can use len
             cost_map.insert((from, to), cost);
             result_map.insert((from, to), v.iter().map(|i| i.to_owned() + "A").collect());
         }
@@ -320,6 +315,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(154115708116294));
     }
 }
