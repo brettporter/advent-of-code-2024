@@ -1,5 +1,6 @@
-use std::{collections::HashMap, option};
+use std::{collections::HashMap, usize};
 
+use fxhash::FxHashMap;
 use itertools::Itertools;
 use nom::{
     character::complete::{newline, one_of},
@@ -74,102 +75,98 @@ fn parse_input(input: &str) -> IResult<&str, Vec<Vec<char>>> {
     many1(terminated(many1(one_of("0123456789A")), opt(newline)))(input)
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
+fn process_robots(input: &str, num_robots: usize) -> Option<u64> {
     let (_, codes) = parse_input(input).unwrap();
 
     let (numeric_map, _) = map_key_moves(&NUMERIC_LAYOUT[..]);
     let (direction_map, direction_cost) = map_key_moves(&DIRECTIONAL_LAYOUT[..]);
 
+    let numeric_map = get_optimised_map(numeric_map, &direction_cost);
+    let direction_map = get_optimised_map(direction_map, &direction_cost);
+
+    let mut cache = FxHashMap::default();
+
     let mut total = 0;
-    // TODO: don't need all of the options
+    // We need to go depth first, we can more effectively cache results when there is a large number of elements to iterate
     for code in codes {
-        let options = get_options(&code, &numeric_map);
+        // TODO: reduce duplicate code
+        let mut prev_key = 'A';
+        let mut best_seq_length = 0;
+        for &key in &code {
+            let options = &numeric_map[&(prev_key, key)];
 
-        let new_options = get_cheapest_option(&options, &direction_cost);
+            best_seq_length += options
+                .iter()
+                .map(|option| calculate_score(option, num_robots, &direction_map, &mut cache))
+                .min()
+                .unwrap();
 
-        let options = new_options
-            .iter()
-            .flat_map(|option| get_options(&option.chars().collect_vec(), &direction_map))
-            .collect_vec();
-        let new_options = get_cheapest_option(&options, &direction_cost);
-
-        let options = new_options
-            .iter()
-            .flat_map(|option| get_options(&option.chars().collect_vec(), &direction_map))
-            .collect_vec();
-        // TODO: doesn't have to be lowest next cost at this stage
-        // let new_options = get_cheapest_option(&options, &direction_cost);
-        let option = options.first().unwrap();
+            prev_key = key;
+        }
 
         let code_number = code[..code.len() - 1]
             .iter()
             .collect::<String>()
             .parse::<usize>()
             .unwrap();
-        total += option.len() * code_number;
+        total += best_seq_length * code_number;
     }
 
-    Some(total as u32)
+    Some(total as u64)
 }
 
-fn get_cheapest_option(
-    options: &[String],
-    direction_cost: &HashMap<(char, char), usize>,
-) -> Vec<String> {
-    let mut new_options = vec![];
-    let mut best_cost = usize::MAX;
-    for option in options {
-        let mut cost = 0;
-        for i in 1..option.len() {
-            let mut c = option[i - 1..=i].chars();
-            let v1 = c.next().unwrap();
-            let v2 = c.next().unwrap();
-            if v1 != v2 {
-                cost += direction_cost[&(v1, v2)];
-            }
-        }
+fn calculate_score(
+    code: &String,
+    depth: usize,
+    direction_map: &HashMap<(char, char), Vec<String>>,
+    cache: &mut FxHashMap<(String, usize), usize>,
+) -> usize {
+    if depth == 0 {
+        return code.len();
+    }
 
-        if cost == best_cost {
-            new_options.push(option.to_owned());
-        } else if cost < best_cost {
-            best_cost = cost;
-            new_options = vec![option.to_owned()];
+    let cache_key = (code.clone(), depth);
+    if let Some(&score) = cache.get(&cache_key) {
+        return score;
+    }
+
+    let mut prev_key = 'A';
+    let mut best_seq_length = 0;
+    for key in code.chars() {
+        let options = &direction_map[&(prev_key, key)];
+
+        best_seq_length += options
+            .iter()
+            .map(|option| calculate_score(option, depth - 1, direction_map, cache))
+            .min()
+            .unwrap();
+
+        prev_key = key;
+    }
+    cache.insert(cache_key, best_seq_length);
+    best_seq_length
+}
+
+fn get_cost(option: &String, direction_cost: &HashMap<(char, char), usize>) -> usize {
+    let mut cost = 0;
+    for i in 1..option.len() {
+        let v = option[i - 1..=i].as_bytes();
+        let v1 = v[0] as char;
+        let v2 = v[1] as char;
+        if v1 != v2 {
+            cost += direction_cost[&(v1, v2)];
         }
     }
-    new_options
-}
-
-fn get_options(code: &[char], map: &HashMap<char, HashMap<char, Vec<String>>>) -> Vec<String> {
-    let mut cur_options: Vec<String> = vec!["".to_string()];
-    let mut cur_key = 'A';
-    for &key in code {
-        let mut options = vec![];
-        for o in cur_options {
-            if cur_key == key {
-                options.push(o + "A");
-            } else {
-                for v in &map[&cur_key][&key] {
-                    options.push(o.clone() + v + "A");
-                }
-            }
-        }
-        cur_key = key;
-        cur_options = options;
-    }
-    cur_options
-}
-
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+    cost
 }
 
 fn map_key_moves(
     layout: &[[char; 3]],
 ) -> (
-    HashMap<char, HashMap<char, Vec<String>>>,
+    HashMap<(char, char), Vec<String>>,
     HashMap<(char, char), usize>,
 ) {
-    let mut map = HashMap::default();
+    let mut map: HashMap<char, HashMap<char, Vec<String>>> = HashMap::default();
 
     let w = layout[0].len();
     let h = layout.len();
@@ -233,40 +230,60 @@ fn map_key_moves(
         }
     }
 
+    let mut result_map = HashMap::default();
     let mut cost_map = HashMap::default();
     for (&from, to_map) in &map {
         for (&to, v) in to_map {
             let cost = v[0].len();
             assert!(v.iter().all(|i| i.len() == cost));
+            // TODO: probably don't need this can use len
             cost_map.insert((from, to), cost);
+            result_map.insert((from, to), v.iter().map(|i| i.to_owned() + "A").collect());
         }
+        result_map.insert((from, from), vec!["A".to_string()]);
+    }
+    (result_map, cost_map)
+}
+
+fn get_optimised_map(
+    map: HashMap<(char, char), Vec<String>>,
+    cost_map: &HashMap<(char, char), usize>,
+) -> HashMap<(char, char), Vec<String>> {
+    let mut optimised_map = HashMap::default();
+    for (k, v) in map {
+        let s = v.into_iter().min_set_by_key(|i| get_cost(i, &cost_map));
+        optimised_map.insert(k, s);
     }
 
-    (map, cost_map)
+    optimised_map
+}
+
+pub fn part_one(input: &str) -> Option<u64> {
+    process_robots(input, 2)
+}
+
+pub fn part_two(input: &str) -> Option<u64> {
+    process_robots(input, 25)
 }
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-
     use super::*;
 
     #[test]
     fn test_map_key_moves() {
         let keys = [['1', '2', '.'], ['.', 'A', '.']];
+
         let expected_map = HashMap::from_iter([
-            (
-                '1',
-                HashMap::from_iter([('2', vec![">".to_string()]), ('A', vec![">v".to_string()])]),
-            ),
-            (
-                '2',
-                HashMap::from_iter([('A', vec!["v".to_string()]), ('1', vec!["<".to_string()])]),
-            ),
-            (
-                'A',
-                HashMap::from_iter([('1', vec!["^<".to_string()]), ('2', vec!["^".to_string()])]),
-            ),
+            (('1', '1'), vec!["A".to_string()]),
+            (('1', '2'), vec![">A".to_string()]),
+            (('1', 'A'), vec![">vA".to_string()]),
+            (('2', '1'), vec!["<A".to_string()]),
+            (('2', 'A'), vec!["vA".to_string()]),
+            (('2', '2'), vec!["A".to_string()]),
+            (('A', '1'), vec!["^<A".to_string()]),
+            (('A', '2'), vec!["^A".to_string()]),
+            (('A', 'A'), vec!["A".to_string()]),
         ]);
         let expected_cost = HashMap::from_iter([
             (('1', '2'), 1),
@@ -277,19 +294,20 @@ mod tests {
             (('A', '2'), 1),
         ]);
 
-        assert_eq!((expected_map, expected_cost), map_key_moves(&keys[..]));
+        let (map, cost) = map_key_moves(&keys[..]);
+        assert_eq!(expected_map, map);
+        assert_eq!(expected_cost, cost);
 
-        let (result, _) = map_key_moves(&DIRECTIONAL_LAYOUT[..]);
-        assert_eq!(result[&'<'][&'^'], vec![">^"]);
-        assert_eq!(
-            result[&'>'][&'^'].iter().sorted().collect_vec(),
-            vec!["<^", "^<"]
-        );
+        let (result, cost) = map_key_moves(&DIRECTIONAL_LAYOUT[..]);
+        let result = get_optimised_map(result, &cost);
+        assert_eq!(result[&('<', '^')], vec![">^A"]);
+        assert_eq!(result[&('>', '^')], vec!["<^A"]);
 
         let (result, _) = map_key_moves(&NUMERIC_LAYOUT[..]);
+        let result = get_optimised_map(result, &cost);
         assert_eq!(
-            result[&'2'][&'9'].iter().sorted().collect_vec(),
-            vec![">^^", "^>^", "^^>"]
+            result[&('2', '9')].iter().sorted().collect_vec(),
+            vec![">^^A", "^^>A"]
         );
     }
 
