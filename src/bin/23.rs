@@ -93,10 +93,7 @@ pub fn part_two(input: &str) -> Option<String> {
 
     let network = map_network(&connections);
 
-    let mut interconnected = find_max_interconnected(&network);
-    interconnected.sort();
-
-    Some(interconnected.join(","))
+    Some(find_max_interconnected(&network).join(","))
 }
 
 #[cfg(test)]
