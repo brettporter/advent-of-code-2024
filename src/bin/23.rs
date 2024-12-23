@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use fxhash::{FxHashMap, FxHashSet};
 use nom::{
     character::complete::{alpha1, char, newline},
@@ -47,6 +49,30 @@ fn find_interconnected(network: &FxHashMap<String, Vec<String>>) -> FxHashSet<Ve
     result
 }
 
+fn find_max_interconnected(network: &FxHashMap<String, Vec<String>>) -> Vec<String> {
+    let interconnected = find_interconnected(network);
+    let mut result = FxHashSet::default();
+
+    for set in interconnected {
+        let mut new_set = set.clone();
+        let mut remaining = VecDeque::from_iter(set);
+        while let Some(node) = remaining.pop_front() {
+            for c in &network[&node] {
+                if !new_set.contains(&c) {
+                    if new_set.iter().all(|i| network[c].contains(i)) {
+                        new_set.push(c.clone());
+                        remaining.push_back(c.clone());
+                    }
+                }
+            }
+        }
+        new_set.sort();
+        result.insert(new_set);
+    }
+
+    result.into_iter().max_by_key(|v| v.len()).unwrap()
+}
+
 pub fn part_one(input: &str) -> Option<u32> {
     let (_, connections) = parse_input(input).unwrap();
 
@@ -62,8 +88,15 @@ pub fn part_one(input: &str) -> Option<u32> {
     )
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<String> {
+    let (_, connections) = parse_input(input).unwrap();
+
+    let network = map_network(&connections);
+
+    let mut interconnected = find_max_interconnected(&network);
+    interconnected.sort();
+
+    Some(interconnected.join(","))
 }
 
 #[cfg(test)]
@@ -79,6 +112,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some("co,de,ka,ta".to_string()));
     }
 }
